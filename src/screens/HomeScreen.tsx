@@ -65,7 +65,10 @@ export default function HomeScreen() {
   };
 
   const renderTripItem = ({ item }: { item: Trip }) => (
-    <View style={styles.tripCard}>
+    <TouchableOpacity 
+      style={styles.tripCard}
+      onPress={() => navigation.navigate('TripDashboard', { tripId: item.id })}
+    >
       <Text style={styles.tripName}>{item.name}</Text>
       <View style={styles.tripDetails}>
         <Text style={styles.tripDate}>
@@ -75,7 +78,7 @@ export default function HomeScreen() {
           {item.status.toUpperCase()}
         </Text>
       </View>
-    </View>
+    </TouchableOpacity>
   );
 
   return (

@@ -7,12 +7,16 @@ import { auth } from '../config/firebaseConfig';
 import HomeScreen from '../screens/HomeScreen';
 import LoginScreen from '../screens/LoginScreen';
 import CreateTripScreen from '../screens/CreateTripScreen';
+import TripDashboardScreen from '../screens/TripDashboardScreen';
+import AddEventScreen from '../screens/AddEventScreen';
 
 // Stack navigation parameter types
 export type RootStackParamList = {
   Login: undefined;
   Home: undefined;
   CreateTrip: undefined;
+  TripDashboard: { tripId: string };
+  AddEvent: { tripId: string };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -57,6 +61,16 @@ export default function AppNavigator() {
               name="CreateTrip" 
               component={CreateTripScreen} 
               options={{ title: 'Plan New Trip', headerBackTitle: 'Back' }} 
+            />
+            <Stack.Screen 
+              name="TripDashboard" 
+              component={TripDashboardScreen} 
+              options={{ headerShown: false }} 
+            />
+            <Stack.Screen 
+              name="AddEvent" 
+              component={AddEventScreen} 
+              options={{ title: 'Add Event', headerBackTitle: 'Back' }} 
             />
           </>
         ) : (

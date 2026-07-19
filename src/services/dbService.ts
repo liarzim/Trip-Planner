@@ -1,6 +1,6 @@
 import { collection, addDoc, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../config/firebaseConfig';
-import { Group, Trip } from '../types';
+import { Group, Trip, Event } from '../types';
 
 /**
  * Creates a new Group document in Firestore.
@@ -114,5 +114,55 @@ export const getTripsForUser = async (userId: string): Promise<Trip[]> => {
       endDate: data.endDate,
       status: data.status,
     } as Trip;
+  });
+};
+
+/**
+ * Saves a new Event to the 'events' collection in Firestore.
+ */
+export const createEvent = async (
+  tripId: string,
+  title: string,
+  type: string,
+  startTime: string,
+  endTime: string
+): Promise<Event> => {
+  const eventsCollection = collection(db, 'events');
+  const docRef = await addDoc(eventsCollection, {
+    tripId,
+    title,
+    type,
+    startTime,
+    endTime,
+  });
+
+  return {
+    id: docRef.id,
+    tripId,
+    title,
+    type,
+    startTime,
+    endTime,
+  };
+};
+
+/**
+ * Fetches all events associated with a specific tripId from Firestore.
+ */
+export const getEventsForTrip = async (tripId: string): Promise<Event[]> => {
+  const eventsCollection = collection(db, 'events');
+  const q = query(eventsCollection, where('tripId', '==', tripId));
+  const querySnapshot = await getDocs(q);
+
+  return querySnapshot.docs.map((doc) => {
+    const data = doc.data();
+    return {
+      id: doc.id,
+      tripId: data.tripId,
+      title: data.title,
+      type: data.type,
+      startTime: data.startTime,
+      endTime: data.endTime,
+    } as Event;
   });
 };

@@ -29,3 +29,12 @@ export interface Expense {
   date: string;
   description: string;
 }
+
+export interface Event {
+  id: string;
+  tripId: string;
+  title: string;
+  type: string; // e.g., flight, hotel, poi
+  startTime: string;
+  endTime: string;
+}
