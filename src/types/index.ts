@@ -40,3 +40,11 @@ export interface Event {
   latitude?: number;
   longitude?: number;
 }
+
+export interface Document {
+  id: string;
+  tripId: string;
+  eventId?: string;
+  name: string;
+  downloadUrl: string;
+}

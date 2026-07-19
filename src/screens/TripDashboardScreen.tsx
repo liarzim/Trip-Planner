@@ -6,13 +6,16 @@ import {
   FlatList, 
   TouchableOpacity, 
   SafeAreaView, 
-  ActivityIndicator 
+  ActivityIndicator,
+  Linking
 } from 'react-native';
 import { useRoute, useNavigation, useFocusEffect, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { getDocumentAsync } from 'expo-document-picker';
 import { RootStackParamList } from '../navigation/AppNavigator';
-import { getEventsForTrip, getExpensesForTrip } from '../services/dbService';
-import { Event, Expense } from '../types';
+import { getEventsForTrip, getExpensesForTrip, getDocumentsForTrip, saveDocument } from '../services/dbService';
+import { uploadTripDocument } from '../services/storageService';
+import { Event, Expense, Document } from '../types';
 
 type TripDashboardRouteProp = RouteProp<RootStackParamList, 'TripDashboard'>;
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'TripDashboard'>;
@@ -24,9 +27,11 @@ export default function TripDashboardScreen() {
 
   const [events, setEvents] = useState<Event[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
+  const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
+  const [documentUploading, setDocumentUploading] = useState(false);
 
-  // Fetch events and expenses in parallel when the screen is focused
+  // Fetch events, expenses, and documents in parallel on screen focus
   useFocusEffect(
     React.useCallback(() => {
       let active = true;
@@ -34,14 +39,16 @@ export default function TripDashboardScreen() {
       const fetchDashboardData = async () => {
         try {
           setLoading(true);
-          const [fetchedEvents, fetchedExpenses] = await Promise.all([
+          const [fetchedEvents, fetchedExpenses, fetchedDocs] = await Promise.all([
             getEventsForTrip(tripId),
-            getExpensesForTrip(tripId)
+            getExpensesForTrip(tripId),
+            getDocumentsForTrip(tripId)
           ]);
           
           if (active) {
             setEvents(fetchedEvents);
             setExpenses(fetchedExpenses);
+            setDocuments(fetchedDocs);
           }
         } catch (error) {
           console.error('Failed to fetch dashboard data:', error);
@@ -59,6 +66,43 @@ export default function TripDashboardScreen() {
       };
     }, [tripId])
   );
+
+  // Open document download URL in default browser
+  const openDocument = (url: string) => {
+    Linking.openURL(url).catch((err) => console.error("Couldn't open URL", err));
+  };
+
+  // Open picker, upload to Storage, and save metadata to Firestore
+  const handlePickAndUpload = async () => {
+    try {
+      const result = await getDocumentAsync({
+        type: '*/*',
+        copyToCacheDirectory: true,
+      });
+
+      if (result.canceled || !result.assets || result.assets.length === 0) {
+        return;
+      }
+
+      const file = result.assets[0];
+      setDocumentUploading(true);
+
+      // 1. Upload the file to Firebase Storage
+      const downloadUrl = await uploadTripDocument(tripId, file.uri, file.name);
+
+      // 2. Save document metadata in Firestore
+      await saveDocument(tripId, file.name, downloadUrl);
+
+      // 3. Refresh list
+      const updatedDocs = await getDocumentsForTrip(tripId);
+      setDocuments(updatedDocs);
+    } catch (error) {
+      console.error('Failed to upload document:', error);
+      alert('Failed to upload document. Please try again.');
+    } finally {
+      setDocumentUploading(false);
+    }
+  };
 
   // Calculate total spent across logged expenses
   const totalSpent = expenses.reduce((sum, item) => sum + item.amount, 0);
@@ -96,6 +140,44 @@ export default function TripDashboardScreen() {
     );
   };
 
+  const renderFooter = () => (
+    <View style={styles.footerSection}>
+      <View style={styles.sectionHeaderRow}>
+        <Text style={styles.sectionTitle}>Attached Documents</Text>
+        <TouchableOpacity 
+          style={styles.attachButton} 
+          onPress={handlePickAndUpload}
+          disabled={documentUploading}
+        >
+          {documentUploading ? (
+            <ActivityIndicator size="small" color="#228be6" />
+          ) : (
+            <Text style={styles.attachButtonText}>+ Add Doc</Text>
+          )}
+        </TouchableOpacity>
+      </View>
+
+      {documents.length === 0 ? (
+        <View style={styles.emptyDocContainer}>
+          <Text style={styles.emptyDocText}>No documents attached yet.</Text>
+        </View>
+      ) : (
+        documents.map((doc) => (
+          <TouchableOpacity 
+            key={doc.id} 
+            style={styles.docRow}
+            onPress={() => openDocument(doc.downloadUrl)}
+          >
+            <Text style={styles.docEmoji}>📄</Text>
+            <Text style={styles.docName} numberOfLines={1}>
+              {doc.name}
+            </Text>
+          </TouchableOpacity>
+        ))
+      )}
+    </View>
+  );
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
@@ -131,6 +213,7 @@ export default function TripDashboardScreen() {
             keyExtractor={(item) => item.id}
             renderItem={renderEventItem}
             contentContainerStyle={styles.listContainer}
+            ListFooterComponent={renderFooter}
             ListEmptyComponent={
               <View style={styles.emptyContainer}>
                 <Text style={styles.emptyText}>No events added to this trip yet.</Text>
@@ -190,9 +273,19 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#212529',
   },
+  mapHeaderButton: {
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+  },
+  mapHeaderText: {
+    color: '#228be6',
+    fontWeight: '600',
+    fontSize: 14,
+  },
   content: {
     flex: 1,
     padding: 20,
+    paddingBottom: 0,
   },
   summaryCard: {
     backgroundColor: '#ffffff',
@@ -279,7 +372,7 @@ const styles = StyleSheet.create({
   emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingTop: 50,
+    paddingVertical: 20,
   },
   emptyText: {
     color: '#495057',
@@ -323,13 +416,60 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     fontSize: 14,
   },
-  mapHeaderButton: {
-    paddingVertical: 6,
-    paddingHorizontal: 10,
+  footerSection: {
+    marginTop: 24,
+    paddingBottom: 40,
   },
-  mapHeaderText: {
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  attachButton: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    backgroundColor: '#e7f5ff',
+    borderWidth: 1,
+    borderColor: '#d0ebff',
+  },
+  attachButtonText: {
     color: '#228be6',
     fontWeight: '600',
+    fontSize: 13,
+  },
+  emptyDocContainer: {
+    padding: 16,
+    backgroundColor: '#ffffff',
+    borderRadius: 8,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#dee2e6',
+    borderStyle: 'dashed',
+  },
+  emptyDocText: {
+    color: '#868e96',
+    fontSize: 13,
+  },
+  docRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 8,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+  },
+  docEmoji: {
+    marginRight: 8,
+    fontSize: 16,
+  },
+  docName: {
+    color: '#228be6',
     fontSize: 14,
+    fontWeight: '500',
+    flex: 1,
   },
 });

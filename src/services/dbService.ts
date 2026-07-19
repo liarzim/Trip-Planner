@@ -1,6 +1,6 @@
 import { collection, addDoc, getDocs, query, where, doc, getDoc } from 'firebase/firestore';
 import { db } from '../config/firebaseConfig';
-import { Group, Trip, Event, Expense } from '../types';
+import { Group, Trip, Event, Expense, Document } from '../types';
 
 /**
  * Creates a new Group document in Firestore.
@@ -229,5 +229,55 @@ export const getExpensesForTrip = async (tripId: string): Promise<Expense[]> => 
       date: data.date,
       description: data.description,
     } as Expense;
+  });
+};
+
+/**
+ * Saves document metadata to the 'documents' collection in Firestore.
+ */
+export const saveDocument = async (
+  tripId: string,
+  name: string,
+  downloadUrl: string,
+  eventId?: string
+): Promise<Document> => {
+  const documentsCollection = collection(db, 'documents');
+  const data: any = {
+    tripId,
+    name,
+    downloadUrl,
+  };
+  if (eventId) {
+    data.eventId = eventId;
+  }
+
+  const docRef = await addDoc(documentsCollection, data);
+
+  return {
+    id: docRef.id,
+    tripId,
+    name,
+    downloadUrl,
+    ...(eventId ? { eventId } : {}),
+  };
+};
+
+/**
+ * Fetches all document metadata documents associated with a specific tripId from Firestore.
+ */
+export const getDocumentsForTrip = async (tripId: string): Promise<Document[]> => {
+  const documentsCollection = collection(db, 'documents');
+  const q = query(documentsCollection, where('tripId', '==', tripId));
+  const querySnapshot = await getDocs(q);
+
+  return querySnapshot.docs.map((doc) => {
+    const data = doc.data();
+    return {
+      id: doc.id,
+      tripId: data.tripId,
+      eventId: data.eventId,
+      name: data.name,
+      downloadUrl: data.downloadUrl,
+    } as Document;
   });
 };
