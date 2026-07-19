@@ -11,8 +11,8 @@ import {
 import { useRoute, useNavigation, useFocusEffect, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
-import { getEventsForTrip } from '../services/dbService';
-import { Event } from '../types';
+import { getEventsForTrip, getExpensesForTrip } from '../services/dbService';
+import { Event, Expense } from '../types';
 
 type TripDashboardRouteProp = RouteProp<RootStackParamList, 'TripDashboard'>;
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'TripDashboard'>;
@@ -23,23 +23,28 @@ export default function TripDashboardScreen() {
   const { tripId } = route.params;
 
   const [events, setEvents] = useState<Event[]>([]);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Fetch events when the screen is focused
+  // Fetch events and expenses in parallel when the screen is focused
   useFocusEffect(
     React.useCallback(() => {
       let active = true;
 
-      const fetchEvents = async () => {
+      const fetchDashboardData = async () => {
         try {
           setLoading(true);
-          // getEventsForTrip will be implemented in Step 4
-          const data = await getEventsForTrip(tripId);
+          const [fetchedEvents, fetchedExpenses] = await Promise.all([
+            getEventsForTrip(tripId),
+            getExpensesForTrip(tripId)
+          ]);
+          
           if (active) {
-            setEvents(data);
+            setEvents(fetchedEvents);
+            setExpenses(fetchedExpenses);
           }
         } catch (error) {
-          console.error('Failed to fetch events:', error);
+          console.error('Failed to fetch dashboard data:', error);
         } finally {
           if (active) {
             setLoading(false);
@@ -47,13 +52,16 @@ export default function TripDashboardScreen() {
         }
       };
 
-      fetchEvents();
+      fetchDashboardData();
 
       return () => {
         active = false;
       };
     }, [tripId])
   );
+
+  // Calculate total spent across logged expenses
+  const totalSpent = expenses.reduce((sum, item) => sum + item.amount, 0);
 
   const getEventBadgeStyle = (type: string) => {
     switch (type.toLowerCase()) {
@@ -94,11 +102,18 @@ export default function TripDashboardScreen() {
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.navigate('Home')}>
           <Text style={styles.backText}>← Dashboard</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Trip Details</Text>
+        <Text style={styles.headerTitle}>Trip Dashboard</Text>
         <View style={{ width: 80 }} /> {/* Spacer */}
       </View>
 
       <View style={styles.content}>
+        {/* Total Spent Summary Card */}
+        <View style={styles.summaryCard}>
+          <Text style={styles.summaryTitle}>Total Spent</Text>
+          <Text style={styles.summaryAmount}>${totalSpent.toFixed(2)} USD</Text>
+          <Text style={styles.summarySubtitle}>Logged from {expenses.length} expenses</Text>
+        </View>
+
         <Text style={styles.sectionTitle}>Daily Itinerary & Events</Text>
 
         {loading ? (
@@ -114,19 +129,28 @@ export default function TripDashboardScreen() {
             ListEmptyComponent={
               <View style={styles.emptyContainer}>
                 <Text style={styles.emptyText}>No events added to this trip yet.</Text>
-                <Text style={styles.emptySubText}>Start building your itinerary!</Text>
+                <Text style={styles.emptySubText}>Start building your itinerary below!</Text>
               </View>
             }
           />
         )}
       </View>
 
-      <TouchableOpacity 
-        style={styles.fab}
-        onPress={() => navigation.navigate('AddEvent', { tripId })}
-      >
-        <Text style={styles.fabText}>+ Add Event</Text>
-      </TouchableOpacity>
+      {/* Floating Action Button Container */}
+      <View style={styles.buttonRow}>
+        <TouchableOpacity 
+          style={[styles.button, styles.eventButton]}
+          onPress={() => navigation.navigate('AddEvent', { tripId })}
+        >
+          <Text style={styles.buttonText}>+ Add Event</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={[styles.button, styles.expenseButton]}
+          onPress={() => navigation.navigate('AddExpense', { tripId })}
+        >
+          <Text style={styles.buttonText}>+ Add Expense</Text>
+        </TouchableOpacity>
+      </View>
     </SafeAreaView>
   );
 }
@@ -165,6 +189,37 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 20,
   },
+  summaryCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  summaryTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#868e96',
+    marginBottom: 4,
+  },
+  summaryAmount: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#2b2f3a',
+    marginBottom: 4,
+  },
+  summarySubtitle: {
+    fontSize: 11,
+    color: '#adb5bd',
+  },
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
@@ -177,7 +232,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   listContainer: {
-    paddingBottom: 80,
+    paddingBottom: 100,
   },
   eventCard: {
     backgroundColor: '#ffffff',
@@ -231,26 +286,36 @@ const styles = StyleSheet.create({
     color: '#868e96',
     fontSize: 13,
   },
-  fab: {
+  buttonRow: {
     position: 'absolute',
     bottom: 24,
-    right: 24,
-    backgroundColor: '#228be6',
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 24,
+    left: 20,
+    right: 20,
     flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  button: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#228be6',
+    marginHorizontal: 6,
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
+    shadowOpacity: 0.15,
     shadowRadius: 8,
     elevation: 6,
   },
-  fabText: {
+  eventButton: {
+    backgroundColor: '#228be6',
+  },
+  expenseButton: {
+    backgroundColor: '#40c057',
+  },
+  buttonText: {
     color: '#ffffff',
     fontWeight: 'bold',
-    fontSize: 16,
+    fontSize: 14,
   },
 });

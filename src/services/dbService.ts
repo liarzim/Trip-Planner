@@ -1,6 +1,6 @@
-import { collection, addDoc, getDocs, query, where } from 'firebase/firestore';
+import { collection, addDoc, getDocs, query, where, doc, getDoc } from 'firebase/firestore';
 import { db } from '../config/firebaseConfig';
-import { Group, Trip, Event } from '../types';
+import { Group, Trip, Event, Expense } from '../types';
 
 /**
  * Creates a new Group document in Firestore.
@@ -164,5 +164,70 @@ export const getEventsForTrip = async (tripId: string): Promise<Event[]> => {
       startTime: data.startTime,
       endTime: data.endTime,
     } as Event;
+  });
+};
+
+/**
+ * Saves a new Expense to the 'expenses' collection in Firestore.
+ * Requires querying the associated trip document to find the correct groupId first.
+ */
+export const createExpense = async (
+  tripId: string,
+  amount: number,
+  currency: string,
+  category: string,
+  description: string
+): Promise<Expense> => {
+  const tripDocRef = doc(db, 'trips', tripId);
+  const tripSnapshot = await getDoc(tripDocRef);
+  if (!tripSnapshot.exists()) {
+    throw new Error('Associated trip does not exist.');
+  }
+  const tripData = tripSnapshot.data();
+  const groupId = tripData.groupId;
+
+  const expensesCollection = collection(db, 'expenses');
+  const docRef = await addDoc(expensesCollection, {
+    tripId,
+    groupId,
+    amount,
+    currency,
+    category,
+    description,
+    date: new Date().toISOString().split('T')[0],
+  });
+
+  return {
+    id: docRef.id,
+    tripId,
+    groupId,
+    amount,
+    currency,
+    category,
+    date: new Date().toISOString().split('T')[0],
+    description,
+  };
+};
+
+/**
+ * Fetches all expenses associated with a specific tripId from Firestore.
+ */
+export const getExpensesForTrip = async (tripId: string): Promise<Expense[]> => {
+  const expensesCollection = collection(db, 'expenses');
+  const q = query(expensesCollection, where('tripId', '==', tripId));
+  const querySnapshot = await getDocs(q);
+
+  return querySnapshot.docs.map((doc) => {
+    const data = doc.data();
+    return {
+      id: doc.id,
+      tripId: data.tripId,
+      groupId: data.groupId,
+      amount: data.amount,
+      currency: data.currency,
+      category: data.category,
+      date: data.date,
+      description: data.description,
+    } as Expense;
   });
 };
