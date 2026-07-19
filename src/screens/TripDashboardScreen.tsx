@@ -18,6 +18,7 @@ import { RootStackParamList } from '../navigation/AppNavigator';
 import { getEventsForTrip, getExpensesForTrip, getDocumentsForTrip, saveDocument } from '../services/dbService';
 import { uploadTripDocument } from '../services/storageService';
 import { Event, Expense, Document } from '../types';
+import { useNetworkState } from '../hooks/useNetworkState';
 
 type TripDashboardRouteProp = RouteProp<RootStackParamList, 'TripDashboard'>;
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'TripDashboard'>;
@@ -32,6 +33,9 @@ export default function TripDashboardScreen() {
   const route = useRoute<TripDashboardRouteProp>();
   const navigation = useNavigation<NavigationProp>();
   const { tripId } = route.params;
+
+  // Track network connectivity state
+  const isOnline = useNetworkState();
 
   const [events, setEvents] = useState<Event[]>([]);
   const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -285,6 +289,15 @@ export default function TripDashboardScreen() {
         </TouchableOpacity>
       </View>
 
+      {/* Offline Mode Warning Banner */}
+      {!isOnline && (
+        <View style={styles.offlineBanner}>
+          <Text style={styles.offlineBannerText}>
+            ⚠️ Offline Mode: Showing cached data. Changes will sync when online.
+          </Text>
+        </View>
+      )}
+
       <View style={styles.content}>
         {/* Total Spent Summary Card */}
         <View style={styles.summaryCard}>
@@ -400,6 +413,21 @@ const styles = StyleSheet.create({
     color: '#228be6',
     fontWeight: '600',
     fontSize: 14,
+  },
+  offlineBanner: {
+    backgroundColor: '#ffe066',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#fcc419',
+  },
+  offlineBannerText: {
+    color: '#664d03',
+    fontSize: 12,
+    fontWeight: '600',
+    textAlign: 'center',
   },
   content: {
     flex: 1,

@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore';
 import { getAuth } from 'firebase/auth';
 import { getStorage } from 'firebase/storage';
 
@@ -16,9 +16,15 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
-// Initialize and export services
-export const db = getFirestore(app);
+// Initialize Auth and Storage
 export const auth = getAuth(app);
 export const storage = getStorage(app);
+
+// Initialize Firestore with persistent offline caching enabled
+export const db = initializeFirestore(app, {
+  localCache: persistentLocalCache({
+    tabManager: persistentMultipleTabManager(),
+  }),
+});
 
 export default app;
