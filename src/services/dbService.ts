@@ -1,4 +1,4 @@
-import { collection, addDoc } from 'firebase/firestore';
+import { collection, addDoc, getDocs, query, where } from 'firebase/firestore';
 import { db } from '../config/firebaseConfig';
 import { Group, Trip } from '../types';
 
@@ -51,4 +51,68 @@ export const createTrip = async (
     endDate,
     status,
   };
+};
+
+/**
+ * Saves a new Trip for a user.
+ * If the user does not have an existing Group (where createdBy === userId),
+ * it automatically creates a default Group for them first, then creates the Trip associated with it.
+ */
+export const saveTripForUser = async (
+  userId: string,
+  name: string,
+  startDate: string,
+  endDate: string
+): Promise<Trip> => {
+  const groupsCollection = collection(db, 'groups');
+  const q = query(groupsCollection, where('createdBy', '==', userId));
+  const querySnapshot = await getDocs(q);
+
+  let groupId = '';
+
+  if (!querySnapshot.empty) {
+    // User already has a group, use the first one
+    const firstGroupDoc = querySnapshot.docs[0];
+    groupId = firstGroupDoc.id;
+  } else {
+    // User does not belong to any group, auto-create a default group
+    const defaultGroupName = 'My Travel Group';
+    const newGroup = await createGroup(defaultGroupName, userId);
+    groupId = newGroup.id;
+  }
+
+  // Save the trip under the selected group
+  return createTrip(groupId, name, startDate, endDate, 'planned');
+};
+
+/**
+ * Fetches all trips associated with groups created by the specified user.
+ */
+export const getTripsForUser = async (userId: string): Promise<Trip[]> => {
+  const groupsCollection = collection(db, 'groups');
+  const qGroup = query(groupsCollection, where('createdBy', '==', userId));
+  const groupSnapshot = await getDocs(qGroup);
+
+  if (groupSnapshot.empty) {
+    return [];
+  }
+
+  const groupIds = groupSnapshot.docs.map((doc) => doc.id);
+
+  // Retrieve trips whose groupId belongs to the user's groups
+  const tripsCollection = collection(db, 'trips');
+  const qTrips = query(tripsCollection, where('groupId', 'in', groupIds));
+  const tripsSnapshot = await getDocs(qTrips);
+
+  return tripsSnapshot.docs.map((doc) => {
+    const data = doc.data();
+    return {
+      id: doc.id,
+      groupId: data.groupId,
+      name: data.name,
+      startDate: data.startDate,
+      endDate: data.endDate,
+      status: data.status,
+    } as Trip;
+  });
 };

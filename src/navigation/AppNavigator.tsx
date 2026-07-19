@@ -6,11 +6,13 @@ import { onAuthStateChanged, User } from 'firebase/auth';
 import { auth } from '../config/firebaseConfig';
 import HomeScreen from '../screens/HomeScreen';
 import LoginScreen from '../screens/LoginScreen';
+import CreateTripScreen from '../screens/CreateTripScreen';
 
 // Stack navigation parameter types
 export type RootStackParamList = {
   Login: undefined;
   Home: undefined;
+  CreateTrip: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -45,11 +47,18 @@ export default function AppNavigator() {
     <NavigationContainer>
       <Stack.Navigator>
         {user ? (
-          <Stack.Screen 
-            name="Home" 
-            component={HomeScreen} 
-            options={{ headerShown: false }} 
-          />
+          <>
+            <Stack.Screen 
+              name="Home" 
+              component={HomeScreen} 
+              options={{ headerShown: false }} 
+            />
+            <Stack.Screen 
+              name="CreateTrip" 
+              component={CreateTripScreen} 
+              options={{ title: 'Plan New Trip', headerBackTitle: 'Back' }} 
+            />
+          </>
         ) : (
           <Stack.Screen 
             name="Login" 

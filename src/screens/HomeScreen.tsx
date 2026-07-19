@@ -1,40 +1,60 @@
-import React from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, SafeAreaView } from 'react-native';
+import React, { useState } from 'react';
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  FlatList, 
+  TouchableOpacity, 
+  SafeAreaView, 
+  ActivityIndicator 
+} from 'react-native';
 import { signOut } from 'firebase/auth';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { auth } from '../config/firebaseConfig';
+import { getTripsForUser } from '../services/dbService';
 import { Trip } from '../types';
+import { RootStackParamList } from '../navigation/AppNavigator';
 
-// Dummy trips matching the Firestore Trip schema
-const dummyTrips: Trip[] = [
-  {
-    id: '1',
-    groupId: 'g1',
-    name: 'Summer Getaway in Paris',
-    startDate: '2026-08-01',
-    endDate: '2026-08-10',
-    status: 'planned',
-  },
-  {
-    id: '2',
-    groupId: 'g1',
-    name: 'Business Summit in Tokyo',
-    startDate: '2026-09-15',
-    endDate: '2026-09-22',
-    status: 'planned',
-  },
-  {
-    id: '3',
-    groupId: 'g2',
-    name: 'Skiing Trip in Swiss Alps',
-    startDate: '2026-12-20',
-    endDate: '2026-12-28',
-    status: 'planned',
-  },
-];
+type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'Home'>;
 
 export default function HomeScreen() {
+  const navigation = useNavigation<NavigationProp>();
+  const [trips, setTrips] = useState<Trip[]>([]);
+  const [loading, setLoading] = useState(true);
+
   const user = auth.currentUser;
   const welcomeName = user?.displayName || user?.email || 'Traveler';
+
+  // Fetch trips from Firestore whenever the screen comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      let active = true;
+
+      const fetchTrips = async () => {
+        if (!user) return;
+        try {
+          setLoading(true);
+          const data = await getTripsForUser(user.uid);
+          if (active) {
+            setTrips(data);
+          }
+        } catch (error) {
+          console.error('Failed to fetch trips:', error);
+        } finally {
+          if (active) {
+            setLoading(false);
+          }
+        }
+      };
+
+      fetchTrips();
+
+      return () => {
+        active = false;
+      };
+    }, [user])
+  );
 
   const handleSignOut = async () => {
     try {
@@ -72,18 +92,34 @@ export default function HomeScreen() {
 
       <View style={styles.content}>
         <Text style={styles.sectionTitle}>Your Upcoming Trips</Text>
-        <FlatList
-          data={dummyTrips}
-          keyExtractor={(item) => item.id}
-          renderItem={renderTripItem}
-          contentContainerStyle={styles.listContainer}
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>No trips scheduled yet.</Text>
-            </View>
-          }
-        />
+        
+        {loading ? (
+          <View style={styles.loaderContainer}>
+            <ActivityIndicator size="large" color="#228be6" />
+          </View>
+        ) : (
+          <FlatList
+            data={trips}
+            keyExtractor={(item) => item.id}
+            renderItem={renderTripItem}
+            contentContainerStyle={styles.listContainer}
+            ListEmptyComponent={
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyText}>No trips scheduled yet.</Text>
+                <Text style={styles.emptySubText}>Tap below to plan your first adventure!</Text>
+              </View>
+            }
+          />
+        )}
       </View>
+
+      {/* Floating Action Button for Trip Creation */}
+      <TouchableOpacity 
+        style={styles.fab} 
+        onPress={() => navigation.navigate('CreateTrip')}
+      >
+        <Text style={styles.fabText}>+ Plan Trip</Text>
+      </TouchableOpacity>
     </SafeAreaView>
   );
 }
@@ -136,8 +172,13 @@ const styles = StyleSheet.create({
     color: '#343a40',
     marginBottom: 15,
   },
+  loaderContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   listContainer: {
-    paddingBottom: 20,
+    paddingBottom: 80, // Extra padding to make sure FAB doesn't cover list items
   },
   tripCard: {
     backgroundColor: '#ffffff',
@@ -175,7 +216,35 @@ const styles = StyleSheet.create({
     paddingTop: 50,
   },
   emptyText: {
+    color: '#495057',
+    fontSize: 15,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  emptySubText: {
     color: '#868e96',
-    fontSize: 14,
+    fontSize: 13,
+  },
+  fab: {
+    position: 'absolute',
+    bottom: 24,
+    right: 24,
+    backgroundColor: '#228be6',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#228be6',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  fabText: {
+    color: '#ffffff',
+    fontWeight: 'bold',
+    fontSize: 16,
   },
 });
