@@ -79,11 +79,10 @@ export default function CreateTripScreen() {
         <Text style={styles.label}>Start Date</Text>
         <TextInput
           style={styles.input}
-          placeholder="YYYY-MM-DD (e.g. 2026-08-01)"
+          placeholder="YYYY-MM-DD"
           value={startDate}
           onChangeText={setStartDate}
-          maxLength={10}
-          keyboardType="numeric"
+          {...(Platform.OS === 'web' ? { type: 'date' } as any : { keyboardType: 'numeric', maxLength: 10 })}
         />
       </View>
 
@@ -91,11 +90,10 @@ export default function CreateTripScreen() {
         <Text style={styles.label}>End Date</Text>
         <TextInput
           style={styles.input}
-          placeholder="YYYY-MM-DD (e.g. 2026-08-10)"
+          placeholder="YYYY-MM-DD"
           value={endDate}
           onChangeText={setEndDate}
-          maxLength={10}
-          keyboardType="numeric"
+          {...(Platform.OS === 'web' ? { type: 'date' } as any : { keyboardType: 'numeric', maxLength: 10 })}
         />
       </View>
 
