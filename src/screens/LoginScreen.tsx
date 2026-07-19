@@ -11,7 +11,7 @@ import {
   TouchableWithoutFeedback,
   Keyboard,
 } from 'react-native';
-import { loginUser, registerUser } from '../services/authService';
+import { loginUser, registerUser, loginWithGoogle } from '../services/authService';
 
 export default function LoginScreen() {
   const [isLogin, setIsLogin] = useState(true);
@@ -37,6 +37,18 @@ export default function LoginScreen() {
       }
     } catch (err: any) {
       setError(err.message || 'Authentication failed. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    setError('');
+    setLoading(true);
+    try {
+      await loginWithGoogle();
+    } catch (err: any) {
+      setError(err.message || 'Google authentication failed.');
     } finally {
       setLoading(false);
     }
@@ -109,6 +121,22 @@ export default function LoginScreen() {
             )}
           </TouchableOpacity>
 
+          {/* Social Sign-In Divider */}
+          <View style={styles.dividerContainer}>
+            <View style={styles.dividerLine} />
+            <Text style={styles.dividerText}>or</Text>
+            <View style={styles.dividerLine} />
+          </View>
+
+          {/* Google Sign-In Button */}
+          <TouchableOpacity
+            style={styles.googleButton}
+            onPress={handleGoogleSignIn}
+            disabled={loading}
+          >
+            <Text style={styles.googleButtonText}>🔵  Sign In with Google</Text>
+          </TouchableOpacity>
+
           <TouchableOpacity
             style={styles.toggleButton}
             onPress={() => {
@@ -150,14 +178,14 @@ const styles = StyleSheet.create({
     fontSize: 24,
     fontWeight: 'bold',
     color: '#212529',
-    marginBottom: 8,
     textAlign: 'center',
+    marginBottom: 8,
   },
   subtitle: {
     fontSize: 14,
     color: '#868e96',
-    marginBottom: 24,
     textAlign: 'center',
+    marginBottom: 24,
   },
   errorText: {
     color: '#fa5252',
@@ -201,13 +229,44 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
+  dividerContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 16,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#dee2e6',
+  },
+  dividerText: {
+    paddingHorizontal: 12,
+    fontSize: 13,
+    color: '#868e96',
+    fontWeight: '500',
+  },
+  googleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#ced4da',
+    borderRadius: 8,
+    paddingVertical: 12,
+    backgroundColor: '#ffffff',
+  },
+  googleButtonText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#495057',
+  },
   toggleButton: {
-    marginTop: 16,
+    marginTop: 20,
     alignItems: 'center',
   },
   toggleButtonText: {
     color: '#228be6',
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: '600',
   },
 });
