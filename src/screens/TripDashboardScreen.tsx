@@ -14,9 +14,12 @@ import { useRoute, useNavigation, useFocusEffect, RouteProp } from '@react-navig
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { getDocumentAsync } from 'expo-document-picker';
 import QRCode from 'react-native-qrcode-svg';
+import * as Sharing from 'expo-sharing';
+import * as FileSystem from 'expo-file-system/legacy';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { getEventsForTrip, getExpensesForTrip, getDocumentsForTrip, saveDocument } from '../services/dbService';
 import { uploadTripDocument } from '../services/storageService';
+import { getCachedOrDownloadFile, isFileCached } from '../services/fileCacheService';
 import { Event, Expense, Document } from '../types';
 import { useNetworkState } from '../hooks/useNetworkState';
 
@@ -42,6 +45,10 @@ export default function TripDashboardScreen() {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
   const [documentUploading, setDocumentUploading] = useState(false);
+
+  // File cache mapping states
+  const [cachedDocUris, setCachedDocUris] = useState<{[docId: string]: string}>({});
+  const [downloadingDocs, setDownloadingDocs] = useState<{[docId: string]: boolean}>({});
 
   // QR Code Modal State
   const [isQrModalVisible, setIsQrModalVisible] = useState(false);
@@ -73,6 +80,9 @@ export default function TripDashboardScreen() {
             setEvents(fetchedEvents);
             setExpenses(fetchedExpenses);
             setDocuments(fetchedDocs);
+            
+            // Map which loaded documents are already cached locally on device
+            await checkCacheStatuses(fetchedDocs);
           }
         } catch (error) {
           console.error('Failed to fetch dashboard data:', error);
@@ -91,9 +101,53 @@ export default function TripDashboardScreen() {
     }, [tripId])
   );
 
-  // Open document download URL in default browser
-  const openDocument = (url: string) => {
-    Linking.openURL(url).catch((err) => console.error("Couldn't open URL", err));
+  // Checks device storage for cached versions of documents
+  const checkCacheStatuses = async (docs: Document[]) => {
+    const uris: {[docId: string]: string} = {};
+    const localDir = FileSystem.documentDirectory;
+
+    for (const docItem of docs) {
+      const isCached = await isFileCached(docItem.name);
+      if (isCached && localDir) {
+        uris[docItem.id] = `${localDir}${encodeURIComponent(docItem.name)}`;
+      }
+    }
+    setCachedDocUris(uris);
+  };
+
+  // Open Document handler: opens local file via share/view sheet, or remote URL on web/fallback
+  const handleOpenDocument = async (docId: string, remoteUrl: string) => {
+    const localUri = cachedDocUris[docId];
+
+    if (localUri) {
+      try {
+        const canShare = await Sharing.isAvailableAsync();
+        if (canShare) {
+          await Sharing.shareAsync(localUri);
+        } else {
+          Linking.openURL(localUri).catch((err) => console.error("Couldn't open local URI", err));
+        }
+      } catch (err) {
+        console.error('Failed to share local document:', err);
+        Linking.openURL(remoteUrl).catch((err) => console.error("Couldn't open remote URL", err));
+      }
+    } else {
+      Linking.openURL(remoteUrl).catch((err) => console.error("Couldn't open URL", err));
+    }
+  };
+
+  // Downloads document to local filecache
+  const handleMakeAvailableOffline = async (docId: string, url: string, name: string) => {
+    setDownloadingDocs((prev) => ({ ...prev, [docId]: true }));
+    try {
+      const localUri = await getCachedOrDownloadFile(url, name);
+      setCachedDocUris((prev) => ({ ...prev, [docId]: localUri }));
+    } catch (error) {
+      console.error('Failed to cache file offline:', error);
+      alert('Failed to cache file for offline access.');
+    } finally {
+      setDownloadingDocs((prev) => ({ ...prev, [docId]: false }));
+    }
   };
 
   // Open picker, upload to Storage, and save metadata to Firestore
@@ -120,6 +174,7 @@ export default function TripDashboardScreen() {
       // 3. Refresh list
       const updatedDocs = await getDocumentsForTrip(tripId);
       setDocuments(updatedDocs);
+      await checkCacheStatuses(updatedDocs);
     } catch (error) {
       console.error('Failed to upload document:', error);
       alert('Failed to upload document. Please try again.');
@@ -258,18 +313,45 @@ export default function TripDashboardScreen() {
           <Text style={styles.emptyDocText}>No documents attached yet.</Text>
         </View>
       ) : (
-        documents.map((doc) => (
-          <TouchableOpacity 
-            key={doc.id} 
-            style={styles.docRow}
-            onPress={() => openDocument(doc.downloadUrl)}
-          >
-            <Text style={styles.docEmoji}>📄</Text>
-            <Text style={styles.docName} numberOfLines={1}>
-              {doc.name}
-            </Text>
-          </TouchableOpacity>
-        ))
+        documents.map((doc) => {
+          const isDownloading = !!downloadingDocs[doc.id];
+          const isCached = !!cachedDocUris[doc.id];
+
+          return (
+            <View key={doc.id} style={styles.docRow}>
+              <View style={styles.docRowInfo}>
+                <Text style={styles.docEmoji}>📄</Text>
+                <Text style={styles.docName} numberOfLines={1}>
+                  {doc.name}
+                </Text>
+                {isCached && <Text style={styles.offlineBadge}>💾 Offline</Text>}
+              </View>
+
+              <View style={styles.docRowActions}>
+                {!isCached && (
+                  <TouchableOpacity
+                    style={[styles.docActionBtn, styles.downloadBtn]}
+                    onPress={() => handleMakeAvailableOffline(doc.id, doc.downloadUrl, doc.name)}
+                    disabled={isDownloading}
+                  >
+                    {isDownloading ? (
+                      <ActivityIndicator size="small" color="#228be6" />
+                    ) : (
+                      <Text style={styles.downloadBtnText}>↓ Keep Offline</Text>
+                    )}
+                  </TouchableOpacity>
+                )}
+
+                <TouchableOpacity
+                  style={[styles.docActionBtn, styles.openBtn]}
+                  onPress={() => handleOpenDocument(doc.id, doc.downloadUrl)}
+                >
+                  <Text style={styles.openBtnText}>Open</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          );
+        })
       )}
     </View>
   );
@@ -673,6 +755,7 @@ const styles = StyleSheet.create({
   docRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     backgroundColor: '#ffffff',
     padding: 12,
     borderRadius: 8,
@@ -680,15 +763,61 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#e9ecef',
   },
+  docRowInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    marginRight: 8,
+  },
   docEmoji: {
     marginRight: 8,
     fontSize: 16,
   },
   docName: {
-    color: '#228be6',
+    color: '#495057',
     fontSize: 14,
     fontWeight: '500',
     flex: 1,
+    marginRight: 6,
+  },
+  offlineBadge: {
+    fontSize: 10,
+    color: '#40c057',
+    backgroundColor: '#ebfbee',
+    paddingVertical: 2,
+    paddingHorizontal: 6,
+    borderRadius: 4,
+    fontWeight: '700',
+  },
+  docRowActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  docActionBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 6,
+    marginLeft: 6,
+  },
+  downloadBtn: {
+    backgroundColor: '#e7f5ff',
+    borderWidth: 1,
+    borderColor: '#d0ebff',
+  },
+  downloadBtnText: {
+    color: '#228be6',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  openBtn: {
+    backgroundColor: '#f1f3f5',
+    borderWidth: 1,
+    borderColor: '#dee2e6',
+  },
+  openBtnText: {
+    color: '#495057',
+    fontSize: 12,
+    fontWeight: '600',
   },
   modalOverlay: {
     flex: 1,
