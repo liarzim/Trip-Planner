@@ -125,16 +125,24 @@ export const createEvent = async (
   title: string,
   type: string,
   startTime: string,
-  endTime: string
+  endTime: string,
+  latitude?: number,
+  longitude?: number,
+  bookingReference?: string
 ): Promise<Event> => {
   const eventsCollection = collection(db, 'events');
-  const docRef = await addDoc(eventsCollection, {
+  const data: any = {
     tripId,
     title,
     type,
     startTime,
     endTime,
-  });
+  };
+  if (latitude !== undefined) data.latitude = latitude;
+  if (longitude !== undefined) data.longitude = longitude;
+  if (bookingReference !== undefined) data.bookingReference = bookingReference;
+
+  const docRef = await addDoc(eventsCollection, data);
 
   return {
     id: docRef.id,
@@ -143,6 +151,9 @@ export const createEvent = async (
     type,
     startTime,
     endTime,
+    latitude,
+    longitude,
+    bookingReference,
   };
 };
 
@@ -163,6 +174,9 @@ export const getEventsForTrip = async (tripId: string): Promise<Event[]> => {
       type: data.type,
       startTime: data.startTime,
       endTime: data.endTime,
+      latitude: data.latitude,
+      longitude: data.longitude,
+      bookingReference: data.bookingReference,
     } as Event;
   });
 };

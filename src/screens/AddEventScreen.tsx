@@ -29,6 +29,9 @@ export default function AddEventScreen() {
   const [type, setType] = useState('flight'); // Default type: flight
   const [startTime, setStartTime] = useState('');
   const [endTime, setEndTime] = useState('');
+  const [latitude, setLatitude] = useState('');
+  const [longitude, setLongitude] = useState('');
+  const [bookingReference, setBookingReference] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -38,11 +41,32 @@ export default function AddEventScreen() {
       return;
     }
 
+    const latVal = latitude ? parseFloat(latitude) : undefined;
+    const lonVal = longitude ? parseFloat(longitude) : undefined;
+
+    if (latitude && isNaN(latVal!)) {
+      setError('Latitude must be a valid number.');
+      return;
+    }
+    if (longitude && isNaN(lonVal!)) {
+      setError('Longitude must be a valid number.');
+      return;
+    }
+
     setError('');
     setLoading(true);
 
     try {
-      await createEvent(tripId, title, type, startTime, endTime);
+      await createEvent(
+        tripId, 
+        title, 
+        type, 
+        startTime, 
+        endTime, 
+        latVal, 
+        lonVal, 
+        bookingReference || undefined
+      );
       navigation.goBack();
     } catch (err: any) {
       setError(err.message || 'Failed to add event.');
@@ -124,6 +148,40 @@ export default function AddEventScreen() {
                 value={endTime}
                 onChangeText={setEndTime}
               />
+            </View>
+
+            <View style={styles.inputContainer}>
+              <Text style={styles.label}>Booking / Ticket Reference (Optional)</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="e.g. LH123456, BOOKING-ID"
+                value={bookingReference}
+                onChangeText={setBookingReference}
+                autoCapitalize="characters"
+              />
+            </View>
+
+            <View style={styles.row}>
+              <View style={[styles.inputContainer, { flex: 1, marginRight: 8 }]}>
+                <Text style={styles.label}>Latitude (Optional)</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="e.g. 48.8566"
+                  value={latitude}
+                  onChangeText={setLatitude}
+                  keyboardType="numeric"
+                />
+              </View>
+              <View style={[styles.inputContainer, { flex: 1, marginLeft: 8 }]}>
+                <Text style={styles.label}>Longitude (Optional)</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="e.g. 2.3522"
+                  value={longitude}
+                  onChangeText={setLongitude}
+                  keyboardType="numeric"
+                />
+              </View>
             </View>
 
             <TouchableOpacity
@@ -240,6 +298,10 @@ const styles = StyleSheet.create({
   typeOptionTextSelected: {
     color: '#228be6',
     fontWeight: '700',
+  },
+  row: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
   },
   primaryButton: {
     backgroundColor: '#228be6',

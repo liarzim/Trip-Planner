@@ -39,6 +39,7 @@ export interface Event {
   endTime: string;
   latitude?: number;
   longitude?: number;
+  bookingReference?: string;
 }
 
 export interface Document {

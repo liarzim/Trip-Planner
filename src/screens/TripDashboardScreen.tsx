@@ -7,11 +7,13 @@ import {
   TouchableOpacity, 
   SafeAreaView, 
   ActivityIndicator,
-  Linking
+  Linking,
+  Modal
 } from 'react-native';
 import { useRoute, useNavigation, useFocusEffect, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { getDocumentAsync } from 'expo-document-picker';
+import QRCode from 'react-native-qrcode-svg';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { getEventsForTrip, getExpensesForTrip, getDocumentsForTrip, saveDocument } from '../services/dbService';
 import { uploadTripDocument } from '../services/storageService';
@@ -19,6 +21,12 @@ import { Event, Expense, Document } from '../types';
 
 type TripDashboardRouteProp = RouteProp<RootStackParamList, 'TripDashboard'>;
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'TripDashboard'>;
+
+interface ChecklistItem {
+  id: string;
+  text: string;
+  completed: boolean;
+}
 
 export default function TripDashboardScreen() {
   const route = useRoute<TripDashboardRouteProp>();
@@ -30,6 +38,18 @@ export default function TripDashboardScreen() {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
   const [documentUploading, setDocumentUploading] = useState(false);
+
+  // QR Code Modal State
+  const [isQrModalVisible, setIsQrModalVisible] = useState(false);
+  const [selectedBookingRef, setSelectedBookingRef] = useState('');
+
+  // Daily Checklist State
+  const [checklist, setChecklist] = useState<ChecklistItem[]>([
+    { id: '1', text: 'Pack tickets & passports', completed: false },
+    { id: '2', text: 'Confirm booking references', completed: false },
+    { id: '3', text: 'Check local weather forecast', completed: false },
+    { id: '4', text: 'Charge external powerbanks & phones', completed: false },
+  ]);
 
   // Fetch events, expenses, and documents in parallel on screen focus
   useFocusEffect(
@@ -104,6 +124,31 @@ export default function TripDashboardScreen() {
     }
   };
 
+  // Deep Link Navigation with Komoot (with Google Maps fallback)
+  const handleNavigateKomoot = async (lat: number, lon: number) => {
+    const komootUrl = `komoot://tour?lat=${lat}&lon=${lon}`;
+    const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${lat},${lon}`;
+
+    try {
+      const isSupported = await Linking.canOpenURL(komootUrl);
+      if (isSupported) {
+        await Linking.openURL(komootUrl);
+      } else {
+        await Linking.openURL(googleMapsUrl);
+      }
+    } catch (err) {
+      console.error('Deep linking error:', err);
+      Linking.openURL(googleMapsUrl);
+    }
+  };
+
+  // Toggle checklist item state
+  const toggleChecklistItem = (id: string) => {
+    setChecklist((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, completed: !item.completed } : item))
+    );
+  };
+
   // Calculate total spent across logged expenses
   const totalSpent = expenses.reduce((sum, item) => sum + item.amount, 0);
 
@@ -123,6 +168,8 @@ export default function TripDashboardScreen() {
 
   const renderEventItem = ({ item }: { item: Event }) => {
     const badge = getEventBadgeStyle(item.type);
+    const hasCoordinates = typeof item.latitude === 'number' && typeof item.longitude === 'number';
+
     return (
       <View style={styles.eventCard}>
         <View style={styles.eventHeader}>
@@ -133,15 +180,60 @@ export default function TripDashboardScreen() {
             </Text>
           </View>
         </View>
+        
         <Text style={styles.eventTime}>
           ⏰ {item.startTime} {item.endTime ? `to ${item.endTime}` : ''}
         </Text>
+
+        {/* Action buttons under event */}
+        <View style={styles.eventActionsRow}>
+          {item.bookingReference ? (
+            <TouchableOpacity 
+              style={styles.actionBtn} 
+              onPress={() => {
+                setSelectedBookingRef(item.bookingReference!);
+                setIsQrModalVisible(true);
+              }}
+            >
+              <Text style={styles.actionBtnText}>🎫 Ticket QR</Text>
+            </TouchableOpacity>
+          ) : null}
+
+          {hasCoordinates ? (
+            <TouchableOpacity 
+              style={[styles.actionBtn, styles.actionBtnSecondary]} 
+              onPress={() => handleNavigateKomoot(item.latitude!, item.longitude!)}
+            >
+              <Text style={[styles.actionBtnText, styles.actionBtnTextSecondary]}>🚴 Komoot Map</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
       </View>
     );
   };
 
   const renderFooter = () => (
     <View style={styles.footerSection}>
+      {/* Daily Checklist Section */}
+      <View style={styles.checklistCard}>
+        <Text style={styles.checklistTitle}>📋 Daily Packing & Checklist</Text>
+        {checklist.map((item) => (
+          <TouchableOpacity 
+            key={item.id} 
+            style={styles.checklistItemRow}
+            onPress={() => toggleChecklistItem(item.id)}
+          >
+            <View style={[styles.checkbox, item.completed && styles.checkboxCompleted]}>
+              {item.completed && <Text style={styles.checkboxTick}>✓</Text>}
+            </View>
+            <Text style={[styles.checklistText, item.completed && styles.checklistTextCompleted]}>
+              {item.text}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {/* Attached Documents Section */}
       <View style={styles.sectionHeaderRow}>
         <Text style={styles.sectionTitle}>Attached Documents</Text>
         <TouchableOpacity 
@@ -239,6 +331,33 @@ export default function TripDashboardScreen() {
           <Text style={styles.buttonText}>+ Add Expense</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Ticket QR Code Modal */}
+      <Modal
+        visible={isQrModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setIsQrModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <Text style={styles.modalTitle}>Booking Reference QR</Text>
+            <Text style={styles.modalSubtitle}>Scan at boarding terminal or reception desk</Text>
+            {selectedBookingRef ? (
+              <View style={styles.qrWrapper}>
+                <QRCode value={selectedBookingRef} size={180} />
+              </View>
+            ) : null}
+            <Text style={styles.bookingRefText}>REF: {selectedBookingRef}</Text>
+            <TouchableOpacity 
+              style={styles.closeModalButton} 
+              onPress={() => setIsQrModalVisible(false)}
+            >
+              <Text style={styles.closeModalButtonText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -368,6 +487,29 @@ const styles = StyleSheet.create({
   eventTime: {
     fontSize: 13,
     color: '#495057',
+    marginBottom: 8,
+  },
+  eventActionsRow: {
+    flexDirection: 'row',
+    marginTop: 4,
+  },
+  actionBtn: {
+    backgroundColor: '#e7f5ff',
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 6,
+    marginRight: 8,
+  },
+  actionBtnText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#228be6',
+  },
+  actionBtnSecondary: {
+    backgroundColor: '#fff0f6',
+  },
+  actionBtnTextSecondary: {
+    color: '#d6336c',
   },
   emptyContainer: {
     alignItems: 'center',
@@ -420,6 +562,54 @@ const styles = StyleSheet.create({
     marginTop: 24,
     paddingBottom: 40,
   },
+  checklistCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+  },
+  checklistTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#343a40',
+    marginBottom: 12,
+  },
+  checklistItemRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f3f5',
+  },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderWidth: 1.5,
+    borderColor: '#ced4da',
+    borderRadius: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  checkboxCompleted: {
+    borderColor: '#40c057',
+    backgroundColor: '#ebfbee',
+  },
+  checkboxTick: {
+    color: '#40c057',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  checklistText: {
+    fontSize: 14,
+    color: '#495057',
+  },
+  checklistTextCompleted: {
+    color: '#868e96',
+    textDecorationLine: 'line-through',
+  },
   sectionHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -471,5 +661,63 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
     flex: 1,
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  modalContainer: {
+    backgroundColor: '#ffffff',
+    borderRadius: 16,
+    padding: 24,
+    alignItems: 'center',
+    width: '80%',
+    maxWidth: 320,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 5,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#212529',
+    marginBottom: 4,
+  },
+  modalSubtitle: {
+    fontSize: 12,
+    color: '#868e96',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  qrWrapper: {
+    padding: 16,
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#dee2e6',
+    marginBottom: 16,
+  },
+  bookingRefText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#495057',
+    marginBottom: 20,
+  },
+  closeModalButton: {
+    backgroundColor: '#228be6',
+    paddingVertical: 10,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+    width: '100%',
+    alignItems: 'center',
+  },
+  closeModalButtonText: {
+    color: '#ffffff',
+    fontSize: 14,
+    fontWeight: 'bold',
   },
 });
