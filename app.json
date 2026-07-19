@@ -8,11 +8,24 @@
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
+      "bundleIdentifier": "com.travelapp.planner",
       "config": {
         "googleMapsApiKey": "AIzaSyBQDLhnckgIUNoj0Yfb88XYI9Xvkt9SJq0"
+      },
+      "infoPlist": {
+        "LSApplicationQueriesSchemes": [
+          "komoot"
+        ]
       }
     },
     "android": {
+      "package": "com.travelapp.planner",
+      "permissions": [
+        "INTERNET",
+        "ACCESS_NETWORK_STATE",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE"
+      ],
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
