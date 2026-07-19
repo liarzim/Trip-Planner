@@ -22,6 +22,8 @@ import { uploadTripDocument } from '../services/storageService';
 import { getCachedOrDownloadFile, isFileCached } from '../services/fileCacheService';
 import { Event, Expense, Document } from '../types';
 import { useNetworkState } from '../hooks/useNetworkState';
+import { colors } from '../theme/colors';
+import { typography } from '../theme/typography';
 
 type TripDashboardRouteProp = RouteProp<RootStackParamList, 'TripDashboard'>;
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'TripDashboard'>;
@@ -214,12 +216,12 @@ export default function TripDashboardScreen() {
   const getEventBadgeStyle = (type: string) => {
     switch (type.toLowerCase()) {
       case 'flight':
-        return { bg: '#e7f5ff', text: '#228be6' };
+        return { bg: colors.primaryLight, text: colors.primary };
       case 'hotel':
-        return { bg: '#ebfbee', text: '#40c057' };
+        return { bg: '#ebfbee', text: '#2b8a3e' };
       case 'poi':
       case 'sightseeing':
-        return { bg: '#fff0f6', text: '#d6336c' };
+        return { bg: colors.secondaryLight, text: colors.secondary };
       default:
         return { bg: '#f1f3f5', text: '#495057' };
     }
@@ -241,7 +243,7 @@ export default function TripDashboardScreen() {
         </View>
         
         <Text style={styles.eventTime}>
-          ⏰ {item.startTime} {item.endTime ? `to ${item.endTime}` : ''}
+          ⏰  {item.startTime} {item.endTime ? `to ${item.endTime}` : ''}
         </Text>
 
         {/* Action buttons under event */}
@@ -254,7 +256,7 @@ export default function TripDashboardScreen() {
                 setIsQrModalVisible(true);
               }}
             >
-              <Text style={styles.actionBtnText}>🎫 Ticket QR</Text>
+              <Text style={styles.actionBtnText}>🎫  Ticket QR</Text>
             </TouchableOpacity>
           ) : null}
 
@@ -263,7 +265,7 @@ export default function TripDashboardScreen() {
               style={[styles.actionBtn, styles.actionBtnSecondary]} 
               onPress={() => handleNavigateKomoot(item.latitude!, item.longitude!)}
             >
-              <Text style={[styles.actionBtnText, styles.actionBtnTextSecondary]}>🚴 Komoot Map</Text>
+              <Text style={[styles.actionBtnText, styles.actionBtnTextSecondary]}>🚴  Komoot Map</Text>
             </TouchableOpacity>
           ) : null}
         </View>
@@ -275,12 +277,13 @@ export default function TripDashboardScreen() {
     <View style={styles.footerSection}>
       {/* Daily Checklist Section */}
       <View style={styles.checklistCard}>
-        <Text style={styles.checklistTitle}>📋 Daily Packing & Checklist</Text>
+        <Text style={styles.checklistTitle}>📋  Daily Packing & Checklist</Text>
         {checklist.map((item) => (
           <TouchableOpacity 
             key={item.id} 
             style={styles.checklistItemRow}
             onPress={() => toggleChecklistItem(item.id)}
+            activeOpacity={0.7}
           >
             <View style={[styles.checkbox, item.completed && styles.checkboxCompleted]}>
               {item.completed && <Text style={styles.checkboxTick}>✓</Text>}
@@ -301,7 +304,7 @@ export default function TripDashboardScreen() {
           disabled={documentUploading}
         >
           {documentUploading ? (
-            <ActivityIndicator size="small" color="#228be6" />
+            <ActivityIndicator size="small" color={colors.primary} />
           ) : (
             <Text style={styles.attachButtonText}>+ Add Doc</Text>
           )}
@@ -335,7 +338,7 @@ export default function TripDashboardScreen() {
                     disabled={isDownloading}
                   >
                     {isDownloading ? (
-                      <ActivityIndicator size="small" color="#228be6" />
+                      <ActivityIndicator size="small" color={colors.primary} />
                     ) : (
                       <Text style={styles.downloadBtnText}>↓ Keep Offline</Text>
                     )}
@@ -362,12 +365,12 @@ export default function TripDashboardScreen() {
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.navigate('Home')}>
           <Text style={styles.backText}>← Dashboard</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Trip Dashboard</Text>
+        <Text style={styles.headerTitle}>Trip Details</Text>
         <TouchableOpacity 
           style={styles.mapHeaderButton} 
           onPress={() => navigation.navigate('TripMap', { tripId })}
         >
-          <Text style={styles.mapHeaderText}>🗺️ Map</Text>
+          <Text style={styles.mapHeaderText}>🗺️  Map</Text>
         </TouchableOpacity>
       </View>
 
@@ -375,13 +378,13 @@ export default function TripDashboardScreen() {
       {!isOnline && (
         <View style={styles.offlineBanner}>
           <Text style={styles.offlineBannerText}>
-            ⚠️ Offline Mode: Showing cached data. Changes will sync when online.
+            ⚠️  Offline Mode: Showing cached data. Changes will sync when online.
           </Text>
         </View>
       )}
 
       <View style={styles.content}>
-        {/* Total Spent Summary Card */}
+        {/* Total Spent Summary Card - Redesigned as Prominent Hero Card */}
         <View style={styles.summaryCard}>
           <Text style={styles.summaryTitle}>Total Spent</Text>
           <Text style={styles.summaryAmount}>${totalSpent.toFixed(2)} USD</Text>
@@ -392,7 +395,7 @@ export default function TripDashboardScreen() {
 
         {loading ? (
           <View style={styles.loaderContainer}>
-            <ActivityIndicator size="large" color="#228be6" />
+            <ActivityIndicator size="large" color={colors.primary} />
           </View>
         ) : (
           <FlatList
@@ -460,7 +463,7 @@ export default function TripDashboardScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: colors.background,
   },
   header: {
     flexDirection: 'row',
@@ -469,46 +472,49 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 15,
     paddingBottom: 15,
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.card,
     borderBottomWidth: 1,
-    borderBottomColor: '#f1f3f5',
+    borderBottomColor: colors.border,
   },
   backButton: {
-    paddingVertical: 6,
+    height: 44, // Touch target safety
+    justifyContent: 'center',
     paddingHorizontal: 10,
   },
   backText: {
-    color: '#228be6',
-    fontWeight: '600',
-    fontSize: 14,
+    color: colors.primary,
+    fontWeight: typography.weights.semibold,
+    fontSize: typography.sizes.sm,
   },
   headerTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#212529',
+    fontFamily: typography.fontFamily,
+    fontSize: typography.sizes.md,
+    fontWeight: typography.weights.bold,
+    color: colors.text,
   },
   mapHeaderButton: {
-    paddingVertical: 6,
+    height: 44, // Touch target safety
+    justifyContent: 'center',
     paddingHorizontal: 10,
   },
   mapHeaderText: {
-    color: '#228be6',
-    fontWeight: '600',
-    fontSize: 14,
+    color: colors.primary,
+    fontWeight: typography.weights.semibold,
+    fontSize: typography.sizes.sm,
   },
   offlineBanner: {
-    backgroundColor: '#ffe066',
+    backgroundColor: '#fff9db',
     paddingVertical: 8,
     paddingHorizontal: 16,
     alignItems: 'center',
     justifyContent: 'center',
     borderBottomWidth: 1,
-    borderBottomColor: '#fcc419',
+    borderBottomColor: '#ffe066',
   },
   offlineBannerText: {
-    color: '#664d03',
-    fontSize: 12,
-    fontWeight: '600',
+    color: '#856404',
+    fontSize: typography.sizes.xs,
+    fontWeight: typography.weights.semibold,
     textAlign: 'center',
   },
   content: {
@@ -517,41 +523,45 @@ const styles = StyleSheet.create({
     paddingBottom: 0,
   },
   summaryCard: {
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.primary,
     borderRadius: 16,
-    padding: 20,
-    marginBottom: 20,
+    padding: 24,
+    marginBottom: 24,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: '#e9ecef',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    elevation: 4,
   },
   summaryTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#868e96',
+    fontFamily: typography.fontFamily,
+    fontSize: typography.sizes.sm,
+    fontWeight: typography.weights.semibold,
+    color: colors.primaryLight,
+    opacity: 0.85,
     marginBottom: 4,
   },
   summaryAmount: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#2b2f3a',
+    fontFamily: typography.fontFamily,
+    fontSize: typography.sizes.xxl,
+    fontWeight: typography.weights.bold,
+    color: colors.white,
     marginBottom: 4,
   },
   summarySubtitle: {
-    fontSize: 11,
-    color: '#adb5bd',
+    fontFamily: typography.fontFamily,
+    fontSize: typography.sizes.xs,
+    color: colors.primaryLight,
+    opacity: 0.75,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#343a40',
-    marginBottom: 15,
+    fontFamily: typography.fontFamily,
+    fontSize: typography.sizes.lg,
+    fontWeight: typography.weights.bold,
+    color: colors.text,
+    marginBottom: 16,
   },
   loaderContainer: {
     flex: 1,
@@ -559,18 +569,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   listContainer: {
-    paddingBottom: 100,
+    paddingBottom: 110,
   },
   eventCard: {
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.card,
     padding: 16,
     borderRadius: 12,
     marginBottom: 12,
-    shadowColor: '#000',
+    borderWidth: 1,
+    borderColor: colors.border,
+    shadowColor: colors.text,
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    shadowOpacity: 0.03,
+    shadowRadius: 6,
+    elevation: 1,
   },
   eventHeader: {
     flexDirection: 'row',
@@ -579,9 +591,10 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   eventTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#212529',
+    fontFamily: typography.fontFamily,
+    fontSize: typography.sizes.md,
+    fontWeight: typography.weights.bold,
+    color: colors.text,
     flex: 1,
     marginRight: 8,
   },
@@ -591,50 +604,59 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   badgeText: {
-    fontSize: 10,
-    fontWeight: '700',
+    fontFamily: typography.fontFamily,
+    fontSize: 9,
+    fontWeight: typography.weights.bold,
   },
   eventTime: {
-    fontSize: 13,
-    color: '#495057',
-    marginBottom: 8,
+    fontFamily: typography.fontFamily,
+    fontSize: typography.sizes.sm,
+    color: colors.textLight,
+    marginBottom: 12,
   },
   eventActionsRow: {
     flexDirection: 'row',
     marginTop: 4,
   },
   actionBtn: {
-    backgroundColor: '#e7f5ff',
-    paddingVertical: 6,
+    height: 38,
+    justifyContent: 'center',
+    backgroundColor: colors.primaryLight,
     paddingHorizontal: 12,
-    borderRadius: 6,
+    borderRadius: 8,
     marginRight: 8,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   actionBtnText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#228be6',
+    fontFamily: typography.fontFamily,
+    fontSize: typography.sizes.sm,
+    fontWeight: typography.weights.semibold,
+    color: colors.primary,
   },
   actionBtnSecondary: {
-    backgroundColor: '#fff0f6',
+    backgroundColor: colors.secondaryLight,
+    borderColor: '#ffecda',
   },
   actionBtnTextSecondary: {
-    color: '#d6336c',
+    color: colors.secondary,
   },
   emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 20,
+    paddingVertical: 30,
   },
   emptyText: {
-    color: '#495057',
-    fontSize: 15,
-    fontWeight: '600',
+    fontFamily: typography.fontFamily,
+    color: colors.text,
+    fontSize: typography.sizes.md,
+    fontWeight: typography.weights.bold,
     marginBottom: 4,
   },
   emptySubText: {
-    color: '#868e96',
-    fontSize: 13,
+    fontFamily: typography.fontFamily,
+    color: colors.textLight,
+    fontSize: typography.sizes.sm,
   },
   buttonRow: {
     position: 'absolute',
@@ -646,78 +668,86 @@ const styles = StyleSheet.create({
   },
   button: {
     flex: 1,
-    paddingVertical: 12,
+    height: 48, // Touch target accessibility
     borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
     marginHorizontal: 6,
-    shadowColor: '#000',
+    shadowColor: colors.text,
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
+    shadowOpacity: 0.1,
     shadowRadius: 8,
-    elevation: 6,
+    elevation: 4,
   },
   eventButton: {
-    backgroundColor: '#228be6',
+    backgroundColor: colors.primary,
   },
   expenseButton: {
-    backgroundColor: '#40c057',
+    backgroundColor: colors.secondary,
   },
   buttonText: {
-    color: '#ffffff',
-    fontWeight: 'bold',
-    fontSize: 14,
+    color: colors.white,
+    fontWeight: typography.weights.bold,
+    fontSize: typography.sizes.md,
   },
   footerSection: {
     marginTop: 24,
     paddingBottom: 40,
   },
   checklistCard: {
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.card,
     borderRadius: 16,
-    padding: 16,
+    padding: 18,
     marginBottom: 24,
     borderWidth: 1,
-    borderColor: '#e9ecef',
+    borderColor: colors.border,
+    shadowColor: colors.text,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 6,
+    elevation: 1,
   },
   checklistTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#343a40',
+    fontFamily: typography.fontFamily,
+    fontSize: typography.sizes.md,
+    fontWeight: typography.weights.bold,
+    color: colors.text,
     marginBottom: 12,
   },
   checklistItemRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 8,
+    paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: '#f1f3f5',
+    borderBottomColor: colors.background,
   },
   checkbox: {
-    width: 20,
-    height: 20,
+    width: 22,
+    height: 22,
     borderWidth: 1.5,
-    borderColor: '#ced4da',
-    borderRadius: 4,
+    borderColor: colors.border,
+    borderRadius: 6,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 10,
+    marginRight: 12,
   },
   checkboxCompleted: {
-    borderColor: '#40c057',
-    backgroundColor: '#ebfbee',
+    borderColor: colors.primary,
+    backgroundColor: colors.primaryLight,
   },
   checkboxTick: {
-    color: '#40c057',
-    fontSize: 12,
-    fontWeight: 'bold',
+    color: colors.primary,
+    fontSize: 13,
+    fontWeight: typography.weights.bold,
   },
   checklistText: {
-    fontSize: 14,
-    color: '#495057',
+    fontFamily: typography.fontFamily,
+    fontSize: typography.sizes.sm,
+    color: colors.text,
+    fontWeight: typography.weights.medium,
   },
   checklistTextCompleted: {
-    color: '#868e96',
+    color: colors.textLight,
     textDecorationLine: 'line-through',
   },
   sectionHeaderRow: {
@@ -727,41 +757,43 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   attachButton: {
-    paddingVertical: 6,
+    height: 38,
+    justifyContent: 'center',
     paddingHorizontal: 12,
     borderRadius: 8,
-    backgroundColor: '#e7f5ff',
+    backgroundColor: colors.primaryLight,
     borderWidth: 1,
-    borderColor: '#d0ebff',
+    borderColor: colors.border,
   },
   attachButtonText: {
-    color: '#228be6',
-    fontWeight: '600',
-    fontSize: 13,
+    color: colors.primary,
+    fontWeight: typography.weights.semibold,
+    fontSize: typography.sizes.sm,
   },
   emptyDocContainer: {
-    padding: 16,
-    backgroundColor: '#ffffff',
-    borderRadius: 8,
+    padding: 20,
+    backgroundColor: colors.card,
+    borderRadius: 12,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#dee2e6',
+    borderColor: colors.border,
     borderStyle: 'dashed',
   },
   emptyDocText: {
-    color: '#868e96',
-    fontSize: 13,
+    fontFamily: typography.fontFamily,
+    color: colors.textLight,
+    fontSize: typography.sizes.sm,
   },
   docRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.card,
     padding: 12,
-    borderRadius: 8,
+    borderRadius: 12,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: '#e9ecef',
+    borderColor: colors.border,
   },
   docRowInfo: {
     flexDirection: 'row',
@@ -774,107 +806,112 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   docName: {
-    color: '#495057',
-    fontSize: 14,
-    fontWeight: '500',
+    fontFamily: typography.fontFamily,
+    color: colors.text,
+    fontSize: typography.sizes.sm,
+    fontWeight: typography.weights.medium,
     flex: 1,
     marginRight: 6,
   },
   offlineBadge: {
-    fontSize: 10,
-    color: '#40c057',
+    fontSize: 9,
+    color: colors.success,
     backgroundColor: '#ebfbee',
     paddingVertical: 2,
     paddingHorizontal: 6,
     borderRadius: 4,
-    fontWeight: '700',
+    fontWeight: typography.weights.bold,
   },
   docRowActions: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   docActionBtn: {
-    paddingVertical: 6,
+    height: 36,
+    justifyContent: 'center',
     paddingHorizontal: 10,
     borderRadius: 6,
     marginLeft: 6,
   },
   downloadBtn: {
-    backgroundColor: '#e7f5ff',
+    backgroundColor: colors.primaryLight,
     borderWidth: 1,
-    borderColor: '#d0ebff',
+    borderColor: colors.border,
   },
   downloadBtnText: {
-    color: '#228be6',
-    fontSize: 12,
-    fontWeight: '600',
+    color: colors.primary,
+    fontSize: 11,
+    fontWeight: typography.weights.bold,
   },
   openBtn: {
     backgroundColor: '#f1f3f5',
     borderWidth: 1,
-    borderColor: '#dee2e6',
+    borderColor: '#e9ecef',
   },
   openBtnText: {
     color: '#495057',
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: 11,
+    fontWeight: typography.weights.bold,
   },
   modalOverlay: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: colors.overlay,
   },
   modalContainer: {
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.card,
     borderRadius: 16,
     padding: 24,
     alignItems: 'center',
     width: '80%',
     maxWidth: 320,
-    shadowColor: '#000',
+    shadowColor: colors.text,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,
     shadowRadius: 12,
     elevation: 5,
   },
   modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#212529',
+    fontFamily: typography.fontFamily,
+    fontSize: typography.sizes.lg,
+    fontWeight: typography.weights.bold,
+    color: colors.text,
     marginBottom: 4,
   },
   modalSubtitle: {
-    fontSize: 12,
-    color: '#868e96',
+    fontFamily: typography.fontFamily,
+    fontSize: typography.sizes.sm,
+    color: colors.textLight,
     marginBottom: 20,
     textAlign: 'center',
   },
   qrWrapper: {
     padding: 16,
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.white,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#dee2e6',
+    borderColor: colors.border,
     marginBottom: 16,
   },
   bookingRefText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#495057',
+    fontFamily: typography.fontFamily,
+    fontSize: typography.sizes.md,
+    fontWeight: typography.weights.bold,
+    color: colors.text,
     marginBottom: 20,
   },
   closeModalButton: {
-    backgroundColor: '#228be6',
-    paddingVertical: 10,
-    paddingHorizontal: 24,
+    backgroundColor: colors.primary,
+    height: 44, // Touch target safety
     borderRadius: 8,
     width: '100%',
     alignItems: 'center',
+    justifyContent: 'center',
   },
   closeModalButtonText: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: 'bold',
+    color: colors.white,
+    fontSize: typography.sizes.md,
+    fontWeight: typography.weights.bold,
   },
 });
