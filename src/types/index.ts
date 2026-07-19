@@ -37,4 +37,6 @@ export interface Event {
   type: string; // e.g., flight, hotel, poi
   startTime: string;
   endTime: string;
+  latitude?: number;
+  longitude?: number;
 }

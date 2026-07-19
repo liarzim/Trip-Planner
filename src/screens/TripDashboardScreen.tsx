@@ -103,7 +103,12 @@ export default function TripDashboardScreen() {
           <Text style={styles.backText}>← Dashboard</Text>
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Trip Dashboard</Text>
-        <View style={{ width: 80 }} /> {/* Spacer */}
+        <TouchableOpacity 
+          style={styles.mapHeaderButton} 
+          onPress={() => navigation.navigate('TripMap', { tripId })}
+        >
+          <Text style={styles.mapHeaderText}>🗺️ Map</Text>
+        </TouchableOpacity>
       </View>
 
       <View style={styles.content}>
@@ -316,6 +321,15 @@ const styles = StyleSheet.create({
   buttonText: {
     color: '#ffffff',
     fontWeight: 'bold',
+    fontSize: 14,
+  },
+  mapHeaderButton: {
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+  },
+  mapHeaderText: {
+    color: '#228be6',
+    fontWeight: '600',
     fontSize: 14,
   },
 });
