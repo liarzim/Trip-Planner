@@ -57,73 +57,86 @@ export default function CreateTripScreen() {
     }
   };
 
+  const renderFormContent = () => (
+    <View style={styles.card}>
+      <Text style={styles.title}>Plan New Trip</Text>
+      <Text style={styles.subtitle}>Enter the details of your upcoming adventure</Text>
+
+      {error ? <Text style={styles.errorText}>{error}</Text> : null}
+
+      <View style={styles.inputContainer}>
+        <Text style={styles.label}>Trip Name</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="e.g. Vacation in Hawaii"
+          value={name}
+          onChangeText={setName}
+          autoCapitalize="sentences"
+        />
+      </View>
+
+      <View style={styles.inputContainer}>
+        <Text style={styles.label}>Start Date</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="YYYY-MM-DD (e.g. 2026-08-01)"
+          value={startDate}
+          onChangeText={setStartDate}
+          maxLength={10}
+          keyboardType="numeric"
+        />
+      </View>
+
+      <View style={styles.inputContainer}>
+        <Text style={styles.label}>End Date</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="YYYY-MM-DD (e.g. 2026-08-10)"
+          value={endDate}
+          onChangeText={setEndDate}
+          maxLength={10}
+          keyboardType="numeric"
+        />
+      </View>
+
+      <TouchableOpacity
+        style={styles.primaryButton}
+        onPress={handleCreate}
+        disabled={loading}
+      >
+        {loading ? (
+          <ActivityIndicator color="#ffffff" />
+        ) : (
+          <Text style={styles.primaryButtonText}>Create Trip</Text>
+        )}
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.secondaryButton}
+        onPress={() => navigation.goBack()}
+        disabled={loading}
+      >
+        <Text style={styles.secondaryButtonText}>Cancel</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
+  // Return standard view on Web to prevent keyboard handler issues blocking mouse clicks
+  if (Platform.OS === 'web') {
+    return (
+      <View style={styles.container}>
+        {renderFormContent()}
+      </View>
+    );
+  }
+
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.container}
       >
-        <View style={styles.card}>
-          <Text style={styles.title}>Plan New Trip</Text>
-          <Text style={styles.subtitle}>Enter the details of your upcoming adventure</Text>
-
-          {error ? <Text style={styles.errorText}>{error}</Text> : null}
-
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Trip Name</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="e.g. Vacation in Hawaii"
-              value={name}
-              onChangeText={setName}
-              autoCapitalize="sentences"
-            />
-          </View>
-
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>Start Date</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="YYYY-MM-DD (e.g. 2026-08-01)"
-              value={startDate}
-              onChangeText={setStartDate}
-              maxLength={10}
-              keyboardType="numeric"
-            />
-          </View>
-
-          <View style={styles.inputContainer}>
-            <Text style={styles.label}>End Date</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="YYYY-MM-DD (e.g. 2026-08-10)"
-              value={endDate}
-              onChangeText={setEndDate}
-              maxLength={10}
-              keyboardType="numeric"
-            />
-          </View>
-
-          <TouchableOpacity
-            style={styles.primaryButton}
-            onPress={handleCreate}
-            disabled={loading}
-          >
-            {loading ? (
-              <ActivityIndicator color="#ffffff" />
-            ) : (
-              <Text style={styles.primaryButtonText}>Create Trip</Text>
-            )}
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles.secondaryButton}
-            onPress={() => navigation.goBack()}
-            disabled={loading}
-          >
-            <Text style={styles.secondaryButtonText}>Cancel</Text>
-          </TouchableOpacity>
-        </View>
+        {renderFormContent()}
       </KeyboardAvoidingView>
     </TouchableWithoutFeedback>
   );

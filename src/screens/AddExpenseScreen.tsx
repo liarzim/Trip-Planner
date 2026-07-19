@@ -62,99 +62,111 @@ export default function AddExpenseScreen() {
 
   const categories = ['Food', 'Transport', 'Accommodation', 'Other'];
 
+  const renderFormContent = () => (
+    <ScrollView contentContainerStyle={styles.scrollContainer}>
+      <View style={styles.card}>
+        <Text style={styles.title}>Track Expense</Text>
+        <Text style={styles.subtitle}>Enter details to log an expense for this trip</Text>
+
+        {error ? <Text style={styles.errorText}>{error}</Text> : null}
+
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>Amount *</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="0.00"
+            value={amount}
+            onChangeText={setAmount}
+            keyboardType="numeric"
+          />
+        </View>
+
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>Currency *</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="e.g. USD, EUR"
+            value={currency}
+            onChangeText={setCurrency}
+            autoCapitalize="characters"
+            maxLength={3}
+          />
+        </View>
+
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>Category *</Text>
+          <View style={styles.categoryContainer}>
+            {categories.map((cat) => (
+              <TouchableOpacity
+                key={cat}
+                style={[
+                  styles.categoryOption,
+                  category === cat && styles.categoryOptionSelected,
+                ]}
+                onPress={() => setCategory(cat)}
+              >
+                <Text
+                  style={[
+                    styles.categoryText,
+                    category === cat && styles.categoryTextSelected,
+                  ]}
+                >
+                  {cat}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>Description *</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="e.g. Dinner, Taxi, Museum entry"
+            value={description}
+            onChangeText={setDescription}
+            autoCapitalize="sentences"
+          />
+        </View>
+
+        <TouchableOpacity
+          style={styles.primaryButton}
+          onPress={handleSave}
+          disabled={loading}
+        >
+          {loading ? (
+            <ActivityIndicator color="#ffffff" />
+          ) : (
+            <Text style={styles.primaryButtonText}>Save Expense</Text>
+          )}
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.secondaryButton}
+          onPress={() => navigation.goBack()}
+          disabled={loading}
+        >
+          <Text style={styles.secondaryButtonText}>Cancel</Text>
+        </TouchableOpacity>
+      </View>
+    </ScrollView>
+  );
+
+  if (Platform.OS === 'web') {
+    return (
+      <View style={styles.container}>
+        {renderFormContent()}
+      </View>
+    );
+  }
+
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.container}
       >
-        <ScrollView contentContainerStyle={styles.scrollContainer}>
-          <View style={styles.card}>
-            <Text style={styles.title}>Track Expense</Text>
-            <Text style={styles.subtitle}>Enter details to log an expense for this trip</Text>
-
-            {error ? <Text style={styles.errorText}>{error}</Text> : null}
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Amount *</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="0.00"
-                value={amount}
-                onChangeText={setAmount}
-                keyboardType="numeric"
-              />
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Currency *</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="e.g. USD, EUR"
-                value={currency}
-                onChangeText={setCurrency}
-                autoCapitalize="characters"
-                maxLength={3}
-              />
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Category *</Text>
-              <View style={styles.categoryContainer}>
-                {categories.map((cat) => (
-                  <TouchableOpacity
-                    key={cat}
-                    style={[
-                      styles.categoryOption,
-                      category === cat && styles.categoryOptionSelected,
-                    ]}
-                    onPress={() => setCategory(cat)}
-                  >
-                    <Text
-                      style={[
-                        styles.categoryText,
-                        category === cat && styles.categoryTextSelected,
-                      ]}
-                    >
-                      {cat}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Description *</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="e.g. Dinner, Taxi, Museum entry"
-                value={description}
-                onChangeText={setDescription}
-                autoCapitalize="sentences"
-              />
-            </View>
-
-            <TouchableOpacity
-              style={styles.primaryButton}
-              onPress={handleSave}
-              disabled={loading}
-            >
-              {loading ? (
-                <ActivityIndicator color="#ffffff" />
-              ) : (
-                <Text style={styles.primaryButtonText}>Save Expense</Text>
-              )}
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.secondaryButton}
-              onPress={() => navigation.goBack()}
-              disabled={loading}
-            >
-              <Text style={styles.secondaryButtonText}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
-        </ScrollView>
+        {renderFormContent()}
       </KeyboardAvoidingView>
     </TouchableWithoutFeedback>
   );
