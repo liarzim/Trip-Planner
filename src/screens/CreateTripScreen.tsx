@@ -14,6 +14,7 @@ import {
 import { useNavigation } from '@react-navigation/native';
 import { auth } from '../config/firebaseConfig';
 import { saveTripForUser } from '../services/dbService';
+import CalendarPicker from '../components/CalendarPicker';
 
 export default function CreateTripScreen() {
   const navigation = useNavigation();
@@ -22,6 +23,10 @@ export default function CreateTripScreen() {
   const [endDate, setEndDate] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  // Calendar visibility states
+  const [showStartPicker, setShowStartPicker] = useState(false);
+  const [showEndPicker, setShowEndPicker] = useState(false);
 
   const handleCreate = async () => {
     if (!name || !startDate || !endDate) {
@@ -77,24 +82,62 @@ export default function CreateTripScreen() {
 
       <View style={styles.inputContainer}>
         <Text style={styles.label}>Start Date</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="YYYY-MM-DD"
-          value={startDate}
-          onChangeText={setStartDate}
-          {...(Platform.OS === 'web' ? { type: 'date' } as any : { keyboardType: 'numeric', maxLength: 10 })}
-        />
+        <TouchableOpacity 
+          activeOpacity={0.8}
+          onPress={() => {
+            setShowStartPicker(!showStartPicker);
+            setShowEndPicker(false);
+          }}
+        >
+          <View pointerEvents="none">
+            <TextInput
+              style={styles.input}
+              placeholder="Select start date"
+              value={startDate}
+              editable={false}
+            />
+          </View>
+        </TouchableOpacity>
+        {showStartPicker && (
+          <CalendarPicker
+            initialDate={startDate || undefined}
+            onSelectDate={(date) => {
+              setStartDate(date);
+              setShowStartPicker(false);
+            }}
+            onClose={() => setShowStartPicker(false)}
+          />
+        )}
       </View>
 
       <View style={styles.inputContainer}>
         <Text style={styles.label}>End Date</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="YYYY-MM-DD"
-          value={endDate}
-          onChangeText={setEndDate}
-          {...(Platform.OS === 'web' ? { type: 'date' } as any : { keyboardType: 'numeric', maxLength: 10 })}
-        />
+        <TouchableOpacity 
+          activeOpacity={0.8}
+          onPress={() => {
+            setShowEndPicker(!showEndPicker);
+            setShowStartPicker(false);
+          }}
+        >
+          <View pointerEvents="none">
+            <TextInput
+              style={styles.input}
+              placeholder="Select end date"
+              value={endDate}
+              editable={false}
+            />
+          </View>
+        </TouchableOpacity>
+        {showEndPicker && (
+          <CalendarPicker
+            initialDate={endDate || undefined}
+            onSelectDate={(date) => {
+              setEndDate(date);
+              setShowEndPicker(false);
+            }}
+            onClose={() => setShowEndPicker(false)}
+          />
+        )}
       </View>
 
       <TouchableOpacity
