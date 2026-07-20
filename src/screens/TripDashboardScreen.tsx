@@ -8,7 +8,8 @@ import {
   SafeAreaView, 
   ActivityIndicator,
   Linking,
-  Modal
+  Modal,
+  Platform
 } from 'react-native';
 import { useRoute, useNavigation, useFocusEffect, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -24,6 +25,8 @@ import { Event, Expense, Document } from '../types';
 import { useNetworkState } from '../hooks/useNetworkState';
 import { colors } from '../theme/colors';
 import { typography } from '../theme/typography';
+import { functions } from '../config/firebaseConfig';
+import { httpsCallable } from 'firebase/functions';
 
 type TripDashboardRouteProp = RouteProp<RootStackParamList, 'TripDashboard'>;
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'TripDashboard'>;
@@ -47,6 +50,11 @@ export default function TripDashboardScreen() {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
   const [documentUploading, setDocumentUploading] = useState(false);
+
+  // Word document parsing states
+  const [parsing, setParsing] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = React.useRef<any>(null);
 
   // File cache mapping states
   const [cachedDocUris, setCachedDocUris] = useState<{[docId: string]: string}>({});
@@ -210,6 +218,118 @@ export default function TripDashboardScreen() {
     );
   };
 
+  // Web drag-and-drop events and file processors
+  const handleDragOver = (e: any) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = () => {
+    setIsDragging(false);
+  };
+
+  const handleDrop = async (e: any) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const files = e.dataTransfer?.files;
+    if (files && files.length > 0) {
+      const file = files[0];
+      if (file.name.toLowerCase().endsWith('.docx')) {
+        await processWebFile(file);
+      } else {
+        alert('Please drop a valid .docx (Word) file.');
+      }
+    }
+  };
+
+  const handleWebFileChange = async (e: any) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      const file = files[0];
+      await processWebFile(file);
+    }
+  };
+
+  const processWebFile = async (file: File) => {
+    setParsing(true);
+    try {
+      const reader = new FileReader();
+      reader.onload = async () => {
+        try {
+          const resultUrl = reader.result as string;
+          const base64Data = resultUrl.split(',')[1];
+
+          const parseTripDocumentFn = httpsCallable(functions, 'parseTripDocument');
+          const response = await parseTripDocumentFn({ base64Data });
+
+          const data = response.data as { success: boolean; events: any[] };
+          if (data && data.success && Array.isArray(data.events)) {
+            navigation.navigate('PreviewConfirm', {
+              tripId,
+              parsedEvents: data.events
+            });
+          } else {
+            alert('Could not parse any travel events from the document.');
+          }
+        } catch (innerError: any) {
+          console.error('Failed to parse during file read:', innerError);
+          alert(`Parsing error: ${innerError.message || innerError}`);
+        } finally {
+          setParsing(false);
+        }
+      };
+      reader.onerror = () => {
+        alert('Failed to read the local file.');
+        setParsing(false);
+      };
+      reader.readAsDataURL(file);
+    } catch (error: any) {
+      console.error('File reading preparation failed:', error);
+      alert(`File load error: ${error.message || error}`);
+      setParsing(false);
+    }
+  };
+
+  // Mobile document picker and base64 parsing helper
+  const handlePickAndParseDocx = async () => {
+    try {
+      const result = await getDocumentAsync({
+        type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        copyToCacheDirectory: true,
+      });
+
+      if (result.canceled || !result.assets || result.assets.length === 0) {
+        return;
+      }
+
+      const file = result.assets[0];
+      setParsing(true);
+
+      // Read file content as base64 using expo-file-system legacy namespace
+      const base64Data = await FileSystem.readAsStringAsync(file.uri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+
+      const parseTripDocumentFn = httpsCallable(functions, 'parseTripDocument');
+      const response = await parseTripDocumentFn({ base64Data });
+
+      const data = response.data as { success: boolean; events: any[] };
+      if (data && data.success && Array.isArray(data.events)) {
+        navigation.navigate('PreviewConfirm', {
+          tripId,
+          parsedEvents: data.events
+        });
+      } else {
+        alert('Could not parse any travel events from the document.');
+      }
+    } catch (error: any) {
+      console.error('Failed to parse itinerary document:', error);
+      alert(`Error parsing document: ${error.message || error}`);
+    } finally {
+      setParsing(false);
+    }
+  };
+
   // Calculate total spent across logged expenses
   const totalSpent = expenses.reduce((sum, item) => sum + item.amount, 0);
 
@@ -293,6 +413,50 @@ export default function TripDashboardScreen() {
             </Text>
           </TouchableOpacity>
         ))}
+      </View>
+
+      {/* Import Itinerary DOCX Card */}
+      <View style={styles.importCard}>
+        <Text style={styles.importTitle}>📄  Import Itinerary from Word</Text>
+        <Text style={styles.importSubtitle}>
+          Upload a Word document (.docx) to automatically extract event timelines, flights, locations, and booking confirmations.
+        </Text>
+
+        {Platform.OS === 'web' ? (
+          <TouchableOpacity
+            style={[
+              styles.dragZone,
+              isDragging && styles.dragZoneActive,
+            ]}
+            onPress={() => fileInputRef.current?.click()}
+            {...({
+              onDragOver: handleDragOver,
+              onDragLeave: handleDragLeave,
+              onDrop: handleDrop,
+            } as any)}
+            activeOpacity={0.8}
+          >
+            <input
+              type="file"
+              ref={fileInputRef}
+              accept=".docx"
+              style={{ display: 'none' }}
+              onChange={handleWebFileChange}
+            />
+            <Text style={styles.dragZoneEmoji}>📥</Text>
+            <Text style={styles.dragZoneText}>
+              {isDragging ? 'Drop your file here!' : 'Drag & Drop your .docx file here, or click to browse'}
+            </Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            style={styles.mobilePickerBtn}
+            onPress={handlePickAndParseDocx}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.mobilePickerBtnText}>📁  Choose Word Document (.docx)</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* Attached Documents Section */}
@@ -456,6 +620,15 @@ export default function TripDashboardScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Cloud Parsing Overlay */}
+      {parsing && (
+        <View style={styles.parsingOverlay}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={styles.parsingText}>Analyzing document in the cloud...</Text>
+          <Text style={styles.parsingSubtitle}>Gemini is extracting your itinerary events...</Text>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -913,5 +1086,93 @@ const styles = StyleSheet.create({
     color: colors.white,
     fontSize: typography.sizes.md,
     fontWeight: typography.weights.bold,
+  },
+  importCard: {
+    backgroundColor: colors.card,
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: 24,
+    borderWidth: 1,
+    borderColor: colors.border,
+    shadowColor: colors.text,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.03,
+    shadowRadius: 6,
+    elevation: 1,
+  },
+  importTitle: {
+    fontFamily: typography.fontFamily,
+    fontSize: typography.sizes.md,
+    fontWeight: typography.weights.bold,
+    color: colors.text,
+    marginBottom: 6,
+  },
+  importSubtitle: {
+    fontFamily: typography.fontFamily,
+    fontSize: typography.sizes.sm,
+    color: colors.textLight,
+    marginBottom: 16,
+    lineHeight: 18,
+  },
+  dragZone: {
+    borderWidth: 2,
+    borderColor: colors.primary,
+    borderStyle: 'dashed',
+    borderRadius: 12,
+    padding: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#f4fbf7',
+  },
+  dragZoneActive: {
+    backgroundColor: '#e8f7ee',
+    borderColor: '#2b8a3e',
+  },
+  dragZoneEmoji: {
+    fontSize: 28,
+    marginBottom: 8,
+  },
+  dragZoneText: {
+    fontFamily: typography.fontFamily,
+    fontSize: typography.sizes.sm,
+    fontWeight: typography.weights.semibold,
+    color: colors.primary,
+    textAlign: 'center',
+  },
+  mobilePickerBtn: {
+    backgroundColor: colors.primary,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mobilePickerBtnText: {
+    color: colors.white,
+    fontWeight: typography.weights.bold,
+    fontSize: typography.sizes.md,
+  },
+  parsingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 999,
+  },
+  parsingText: {
+    fontFamily: typography.fontFamily,
+    fontSize: typography.sizes.lg,
+    fontWeight: typography.weights.bold,
+    color: colors.text,
+    marginTop: 16,
+    marginBottom: 4,
+  },
+  parsingSubtitle: {
+    fontFamily: typography.fontFamily,
+    fontSize: typography.sizes.sm,
+    color: colors.textLight,
   },
 });

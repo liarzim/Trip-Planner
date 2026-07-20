@@ -11,6 +11,7 @@ import TripDashboardScreen from '../screens/TripDashboardScreen';
 import AddEventScreen from '../screens/AddEventScreen';
 import AddExpenseScreen from '../screens/AddExpenseScreen';
 import TripMapScreen from '../screens/TripMapScreen';
+import PreviewConfirmScreen from '../screens/PreviewConfirmScreen';
 
 // Stack navigation parameter types
 export type RootStackParamList = {
@@ -21,6 +22,7 @@ export type RootStackParamList = {
   AddEvent: { tripId: string };
   AddExpense: { tripId: string };
   TripMap: { tripId: string };
+  PreviewConfirm: { tripId: string; parsedEvents: any[] };
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -84,6 +86,11 @@ export default function AppNavigator() {
             <Stack.Screen 
               name="TripMap" 
               component={TripMapScreen} 
+              options={{ headerShown: false }} 
+            />
+            <Stack.Screen 
+              name="PreviewConfirm" 
+              component={PreviewConfirmScreen} 
               options={{ headerShown: false }} 
             />
           </>
