@@ -78,6 +78,10 @@ export default function TripDashboardScreen() {
   // Trip start date state
   const [tripStartDate, setTripStartDate] = useState('');
 
+  // Trip budget settings states
+  const [tripBaseCurrency, setTripBaseCurrency] = useState('USD');
+  const [tripExchangeRate, setTripExchangeRate] = useState<number | null>(null);
+
   // Add Event Modal Form State
   const [isAddEventModalVisible, setIsAddEventModalVisible] = useState(false);
   const [eventTitle, setEventTitle] = useState('');
@@ -89,6 +93,7 @@ export default function TripDashboardScreen() {
   const [eventLongitude, setEventLongitude] = useState('');
   const [eventBookingReference, setEventBookingReference] = useState('');
   const [eventDescription, setEventDescription] = useState('');
+  const [eventCost, setEventCost] = useState('');
   const [eventSaving, setEventSaving] = useState(false);
   const [eventFormError, setEventFormError] = useState('');
 
@@ -125,6 +130,14 @@ export default function TripDashboardScreen() {
             setDocuments(fetchedDocs);
             if (fetchedTrip) {
               setTripStartDate(fetchedTrip.startDate);
+              if (fetchedTrip.baseCurrency) {
+                setTripBaseCurrency(fetchedTrip.baseCurrency);
+              }
+              if (fetchedTrip.exchangeRateToILS !== undefined) {
+                setTripExchangeRate(fetchedTrip.exchangeRateToILS);
+              } else {
+                setTripExchangeRate(null);
+              }
             }
             
             // Map which loaded documents are already cached locally on device
@@ -305,6 +318,7 @@ export default function TripDashboardScreen() {
     setEventLongitude('');
     setEventBookingReference('');
     setEventDescription('');
+    setEventCost('');
     setEventFormError('');
     setIsAddEventModalVisible(true);
   };
@@ -332,6 +346,12 @@ export default function TripDashboardScreen() {
       return;
     }
 
+    const costVal = eventCost ? parseFloat(eventCost) : undefined;
+    if (eventCost && isNaN(costVal!)) {
+      setEventFormError(isRTL ? 'העלות חייבת להיות מספר תקין' : 'Cost must be a valid number');
+      return;
+    }
+
     setEventFormError('');
     setEventSaving(true);
 
@@ -349,13 +369,17 @@ export default function TripDashboardScreen() {
       await createEvent(
         tripId,
         eventTitle.trim(),
-        eventType.toLowerCase(),
+        eventType.toLowerCase() as 'flight' | 'hotel' | 'waypoint',
         combinedStart,
         combinedEnd,
         latVal,
         lonVal,
         eventBookingReference?.trim() || undefined,
-        eventDescription?.trim() || undefined
+        eventDescription?.trim() || undefined,
+        undefined, undefined, undefined, undefined, undefined,
+        undefined, undefined, undefined, undefined, undefined,
+        undefined, undefined, undefined, undefined, undefined,
+        costVal
       );
 
       // Refresh list
@@ -590,6 +614,19 @@ export default function TripDashboardScreen() {
         <Text style={[styles.eventTime, textAlignStyle]}>
           ⏰  {item.startTime} {item.endTime ? (isRTL ? `עד ${item.endTime}` : `to ${item.endTime}`) : ''}
         </Text>
+
+        {typeof item.cost === 'number' && (
+          <View style={[rowDirectionStyle, { alignItems: 'center', marginVertical: 4 }]}>
+            <Text style={[styles.eventCostText, textAlignStyle]}>
+              💰 {item.cost.toFixed(2)} {tripBaseCurrency}
+            </Text>
+            {typeof tripExchangeRate === 'number' && (
+              <Text style={styles.eventCostConvertedText}>
+                {'  '}(₪{(item.cost * tripExchangeRate).toFixed(2)})
+              </Text>
+            )}
+          </View>
+        )}
 
         {/* Notes/Description Rendering */}
         {item.description ? (
@@ -839,6 +876,13 @@ export default function TripDashboardScreen() {
           </TouchableOpacity>
           <Text style={styles.headerTitle}>{t('dashboard.title')}</Text>
           <View style={[rowDirectionStyle, { alignItems: 'center' }]}>
+            <TouchableOpacity 
+              style={[styles.settingsButton, { marginRight: isRTL ? 0 : 10, marginLeft: isRTL ? 10 : 0 }]} 
+              onPress={() => navigation.navigate('TripSettings', { tripId })}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.settingsButtonText}>⚙️</Text>
+            </TouchableOpacity>
             <LanguageSelector />
           </View>
         </View>
@@ -865,6 +909,13 @@ export default function TripDashboardScreen() {
         <Text style={styles.headerTitle}>{t('dashboard.title')}</Text>
         
         <View style={[rowDirectionStyle, { alignItems: 'center' }]}>
+          <TouchableOpacity 
+            style={[styles.settingsButton, { marginRight: isRTL ? 0 : 10, marginLeft: isRTL ? 10 : 0 }]} 
+            onPress={() => navigation.navigate('TripSettings', { tripId })}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.settingsButtonText}>⚙️</Text>
+          </TouchableOpacity>
           <LanguageSelector />
         </View>
       </View>
@@ -1019,7 +1070,7 @@ export default function TripDashboardScreen() {
                   {[
                     { label: `✈️ ${isRTL ? 'טיסה' : 'Flight'}`, value: 'flight' },
                     { label: `🏨 ${isRTL ? 'מלון' : 'Hotel'}`, value: 'hotel' },
-                    { label: `📍 ${isRTL ? 'אטרקציה' : 'POI'}`, value: 'poi' },
+                    { label: `📍 ${isRTL ? 'נקודת ציון' : 'Waypoint'}`, value: 'waypoint' },
                   ].map((item) => (
                     <TouchableOpacity
                       key={item.value}
@@ -1080,6 +1131,20 @@ export default function TripDashboardScreen() {
                     onChangeText={setEventEndTime}
                   />
                 </View>
+              </View>
+
+              {/* Cost */}
+              <View style={{ marginBottom: 12 }}>
+                <Text style={[styles.modalFormLabel, textAlignStyle]}>
+                  {isRTL ? `עלות (${tripBaseCurrency})` : `Cost (${tripBaseCurrency})`}
+                </Text>
+                <TextInput
+                  style={[styles.modalFormInput, textAlignStyle]}
+                  placeholder="e.g. 100.00"
+                  value={eventCost}
+                  onChangeText={setEventCost}
+                  keyboardType="decimal-pad"
+                />
               </View>
 
               {/* Booking Reference */}
@@ -2023,5 +2088,29 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: 'bold',
     color: '#495057',
+  },
+  settingsButton: {
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: '#f1f3f5',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 36,
+    height: 36,
+  },
+  settingsButtonText: {
+    fontSize: 16,
+  },
+  eventCostText: {
+    fontFamily: typography.fontFamily,
+    fontSize: typography.sizes.sm,
+    fontWeight: typography.weights.bold,
+    color: '#2b8a3e',
+  },
+  eventCostConvertedText: {
+    fontFamily: typography.fontFamily,
+    fontSize: typography.sizes.xs,
+    color: '#868e96',
+    fontWeight: typography.weights.medium,
   },
 });

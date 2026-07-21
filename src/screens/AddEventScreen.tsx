@@ -66,7 +66,7 @@ export default function AddEventScreen() {
       await createEvent(
         tripId, 
         title, 
-        type, 
+        type as 'flight' | 'hotel' | 'waypoint', 
         startTime, 
         endTime, 
         latVal, 
@@ -90,7 +90,7 @@ export default function AddEventScreen() {
   const eventTypes = [
     { label: `✈️ ${t('event.flight')}`, value: 'flight' },
     { label: `🏨 ${t('event.hotel')}`, value: 'hotel' },
-    { label: `📍 ${t('event.poi')}`, value: 'poi' },
+    { label: `📍 ${isRTL ? 'נקודת ציון' : 'Waypoint'}`, value: 'waypoint' },
   ];
 
   // Dynamic layout alignment rules based on RTL orientation

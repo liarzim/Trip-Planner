@@ -32,16 +32,22 @@ export const createTrip = async (
   name: string,
   startDate: string,
   endDate: string,
-  status: string
+  status: string,
+  baseCurrency?: string,
+  exchangeRateToILS?: number
 ): Promise<Trip> => {
   const tripsCollection = collection(db, 'trips');
-  const docRef = await addDoc(tripsCollection, {
+  const data: any = {
     groupId,
     name,
     startDate,
     endDate,
     status,
-  });
+  };
+  if (baseCurrency !== undefined) data.baseCurrency = baseCurrency;
+  if (exchangeRateToILS !== undefined) data.exchangeRateToILS = exchangeRateToILS;
+
+  const docRef = await addDoc(tripsCollection, data);
 
   return {
     id: docRef.id,
@@ -50,6 +56,8 @@ export const createTrip = async (
     startDate,
     endDate,
     status,
+    baseCurrency,
+    exchangeRateToILS,
   };
 };
 
@@ -113,6 +121,8 @@ export const getTripsForUser = async (userId: string): Promise<Trip[]> => {
       startDate: data.startDate,
       endDate: data.endDate,
       status: data.status,
+      baseCurrency: data.baseCurrency,
+      exchangeRateToILS: data.exchangeRateToILS,
     } as Trip;
   });
 };
@@ -123,13 +133,29 @@ export const getTripsForUser = async (userId: string): Promise<Trip[]> => {
 export const createEvent = async (
   tripId: string,
   title: string,
-  type: string,
+  type: 'flight' | 'hotel' | 'waypoint',
   startTime: string,
   endTime: string,
   latitude?: number,
   longitude?: number,
   bookingReference?: string,
-  description?: string
+  description?: string,
+  flightNumber?: string,
+  airline?: string,
+  departureTime?: string,
+  arrivalTime?: string,
+  originAirport?: string,
+  destinationAirport?: string,
+  hotelUrl?: string,
+  checkInTime?: string,
+  checkOutTime?: string,
+  roomType?: string,
+  breakfastIncluded?: boolean,
+  distance?: number,
+  estimatedTravelTime?: string,
+  qrCodeUrl?: string,
+  transportMode?: string,
+  cost?: number
 ): Promise<Event> => {
   const eventsCollection = collection(db, 'events');
   const data: any = {
@@ -143,6 +169,22 @@ export const createEvent = async (
   if (longitude !== undefined) data.longitude = longitude;
   if (bookingReference !== undefined) data.bookingReference = bookingReference;
   if (description !== undefined) data.description = description;
+  if (flightNumber !== undefined) data.flightNumber = flightNumber;
+  if (airline !== undefined) data.airline = airline;
+  if (departureTime !== undefined) data.departureTime = departureTime;
+  if (arrivalTime !== undefined) data.arrivalTime = arrivalTime;
+  if (originAirport !== undefined) data.originAirport = originAirport;
+  if (destinationAirport !== undefined) data.destinationAirport = destinationAirport;
+  if (hotelUrl !== undefined) data.hotelUrl = hotelUrl;
+  if (checkInTime !== undefined) data.checkInTime = checkInTime;
+  if (checkOutTime !== undefined) data.checkOutTime = checkOutTime;
+  if (roomType !== undefined) data.roomType = roomType;
+  if (breakfastIncluded !== undefined) data.breakfastIncluded = breakfastIncluded;
+  if (distance !== undefined) data.distance = distance;
+  if (estimatedTravelTime !== undefined) data.estimatedTravelTime = estimatedTravelTime;
+  if (qrCodeUrl !== undefined) data.qrCodeUrl = qrCodeUrl;
+  if (transportMode !== undefined) data.transportMode = transportMode;
+  if (cost !== undefined) data.cost = cost;
 
   const docRef = await addDoc(eventsCollection, data);
 
@@ -157,6 +199,22 @@ export const createEvent = async (
     longitude,
     bookingReference,
     description,
+    flightNumber,
+    airline,
+    departureTime,
+    arrivalTime,
+    originAirport,
+    destinationAirport,
+    hotelUrl,
+    checkInTime,
+    checkOutTime,
+    roomType,
+    breakfastIncluded,
+    distance,
+    estimatedTravelTime,
+    qrCodeUrl,
+    transportMode,
+    cost,
   };
 };
 
@@ -181,6 +239,22 @@ export const getEventsForTrip = async (tripId: string): Promise<Event[]> => {
       longitude: data.longitude,
       bookingReference: data.bookingReference,
       description: data.description,
+      flightNumber: data.flightNumber,
+      airline: data.airline,
+      departureTime: data.departureTime,
+      arrivalTime: data.arrivalTime,
+      originAirport: data.originAirport,
+      destinationAirport: data.destinationAirport,
+      hotelUrl: data.hotelUrl,
+      checkInTime: data.checkInTime,
+      checkOutTime: data.checkOutTime,
+      roomType: data.roomType,
+      breakfastIncluded: data.breakfastIncluded,
+      distance: data.distance,
+      estimatedTravelTime: data.estimatedTravelTime,
+      qrCodeUrl: data.qrCodeUrl,
+      transportMode: data.transportMode,
+      cost: data.cost,
     } as Event;
   });
 };
@@ -378,5 +452,22 @@ export const getTrip = async (tripId: string): Promise<Trip | null> => {
     startDate: data.startDate,
     endDate: data.endDate,
     status: data.status,
+    baseCurrency: data.baseCurrency,
+    exchangeRateToILS: data.exchangeRateToILS,
   } as Trip;
+};
+
+/**
+ * Updates the currency settings for a specific trip in Firestore.
+ */
+export const updateTripSettings = async (
+  tripId: string,
+  baseCurrency: string,
+  exchangeRateToILS: number
+): Promise<void> => {
+  const tripDocRef = doc(db, 'trips', tripId);
+  await updateDoc(tripDocRef, {
+    baseCurrency,
+    exchangeRateToILS,
+  });
 };

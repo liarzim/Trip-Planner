@@ -17,6 +17,8 @@ export interface Trip {
   startDate: string;
   endDate: string;
   status: string;
+  baseCurrency?: string;
+  exchangeRateToILS?: number;
 }
 
 export interface Expense {
@@ -34,13 +36,29 @@ export interface Event {
   id: string;
   tripId: string;
   title: string;
-  type: string; // e.g., flight, hotel, poi
+  type: 'flight' | 'hotel' | 'waypoint';
   startTime: string;
   endTime: string;
   latitude?: number;
   longitude?: number;
   bookingReference?: string;
   description?: string;
+  flightNumber?: string;
+  airline?: string;
+  departureTime?: string;
+  arrivalTime?: string;
+  originAirport?: string;
+  destinationAirport?: string;
+  hotelUrl?: string;
+  checkInTime?: string;
+  checkOutTime?: string;
+  roomType?: string;
+  breakfastIncluded?: boolean;
+  distance?: number;
+  estimatedTravelTime?: string;
+  qrCodeUrl?: string;
+  transportMode?: string;
+  cost?: number;
 }
 
 export interface Document {

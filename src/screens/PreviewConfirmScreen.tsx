@@ -101,10 +101,17 @@ export default function PreviewConfirmScreen() {
             ? `${event.date} ${event.endTime}`
             : '';
 
+          const normalizeEventType = (tStr: string): 'flight' | 'hotel' | 'waypoint' => {
+            const lower = tStr ? tStr.toLowerCase() : '';
+            if (lower === 'flight') return 'flight';
+            if (lower === 'hotel' || lower === 'accommodation') return 'hotel';
+            return 'waypoint';
+          };
+
           return createEvent(
             tripId,
             event.title.trim(),
-            event.type.toLowerCase(),
+            normalizeEventType(event.type),
             combinedStart,
             combinedEnd,
             event.latitude,
