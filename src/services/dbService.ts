@@ -360,3 +360,23 @@ export const deletePackingItem = async (itemId: string): Promise<void> => {
   const itemDocRef = doc(db, 'packingItems', itemId);
   await deleteDoc(itemDocRef);
 };
+
+/**
+ * Fetches a single Trip document by its ID.
+ */
+export const getTrip = async (tripId: string): Promise<Trip | null> => {
+  const tripDocRef = doc(db, 'trips', tripId);
+  const tripSnapshot = await getDoc(tripDocRef);
+  if (!tripSnapshot.exists()) {
+    return null;
+  }
+  const data = tripSnapshot.data();
+  return {
+    id: tripSnapshot.id,
+    groupId: data.groupId,
+    name: data.name,
+    startDate: data.startDate,
+    endDate: data.endDate,
+    status: data.status,
+  } as Trip;
+};

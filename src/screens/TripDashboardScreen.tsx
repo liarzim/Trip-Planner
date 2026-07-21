@@ -9,7 +9,9 @@ import {
   ActivityIndicator,
   Linking,
   Modal,
-  Platform
+  Platform,
+  TextInput,
+  ScrollView
 } from 'react-native';
 import { useRoute, useNavigation, useFocusEffect, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -18,13 +20,14 @@ import QRCode from 'react-native-qrcode-svg';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system/legacy';
 import { RootStackParamList } from '../navigation/AppNavigator';
-import { getEventsForTrip, getExpensesForTrip, getDocumentsForTrip, saveDocument } from '../services/dbService';
+import { getEventsForTrip, getExpensesForTrip, getDocumentsForTrip, saveDocument, getTrip, createEvent } from '../services/dbService';
 import { uploadTripDocument } from '../services/storageService';
 import { getCachedOrDownloadFile, isFileCached } from '../services/fileCacheService';
 import { Event, Expense, Document } from '../types';
 import { useNetworkState } from '../hooks/useNetworkState';
 import { colors } from '../theme/colors';
 import { typography } from '../theme/typography';
+import MapPicker from '../components/MapPicker';
 import { functions } from '../config/firebaseConfig';
 import { httpsCallable } from 'firebase/functions';
 import { useTranslation } from '../services/translationService';
@@ -71,6 +74,23 @@ export default function TripDashboardScreen() {
   const [isQrModalVisible, setIsQrModalVisible] = useState(false);
   const [selectedBookingRef, setSelectedBookingRef] = useState('');
 
+  // Trip start date state
+  const [tripStartDate, setTripStartDate] = useState('');
+
+  // Add Event Modal Form State
+  const [isAddEventModalVisible, setIsAddEventModalVisible] = useState(false);
+  const [eventTitle, setEventTitle] = useState('');
+  const [eventType, setEventType] = useState('flight');
+  const [eventDate, setEventDate] = useState('');
+  const [eventStartTime, setEventStartTime] = useState('');
+  const [eventEndTime, setEventEndTime] = useState('');
+  const [eventLatitude, setEventLatitude] = useState('');
+  const [eventLongitude, setEventLongitude] = useState('');
+  const [eventBookingReference, setEventBookingReference] = useState('');
+  const [eventDescription, setEventDescription] = useState('');
+  const [eventSaving, setEventSaving] = useState(false);
+  const [eventFormError, setEventFormError] = useState('');
+
   // Daily Checklist State
   const [checklist, setChecklist] = useState<ChecklistItem[]>([
     { id: '1', text: 'Pack tickets & passports', completed: false },
@@ -87,16 +107,20 @@ export default function TripDashboardScreen() {
       const fetchDashboardData = async () => {
         try {
           setLoading(true);
-          const [fetchedEvents, fetchedExpenses, fetchedDocs] = await Promise.all([
+          const [fetchedEvents, fetchedExpenses, fetchedDocs, fetchedTrip] = await Promise.all([
             getEventsForTrip(tripId),
             getExpensesForTrip(tripId),
-            getDocumentsForTrip(tripId)
+            getDocumentsForTrip(tripId),
+            getTrip(tripId)
           ]);
           
           if (active) {
             setEvents(fetchedEvents);
             setExpenses(fetchedExpenses);
             setDocuments(fetchedDocs);
+            if (fetchedTrip) {
+              setTripStartDate(fetchedTrip.startDate);
+            }
             
             // Map which loaded documents are already cached locally on device
             await checkCacheStatuses(fetchedDocs);
@@ -223,6 +247,127 @@ export default function TripDashboardScreen() {
     setChecklist((prev) =>
       prev.map((item) => (item.id === id ? { ...item, completed: !item.completed } : item))
     );
+  };
+
+  // Helper to parse time string into minutes from midnight
+  const parseTimeToMinutes = (timeStr: string): number | null => {
+    if (!timeStr) return null;
+    const clean = timeStr.trim().toLowerCase();
+    
+    // Match 12-hour: e.g. 10:00 pm, 08:30 am
+    const match12 = clean.match(/^(\d{1,2}):(\d{2})\s*(am|pm)$/);
+    if (match12) {
+      let hours = parseInt(match12[1], 10);
+      const minutes = parseInt(match12[2], 10);
+      const ampm = match12[3];
+      if (ampm === 'pm' && hours < 12) hours += 12;
+      if (ampm === 'am' && hours === 12) hours = 0;
+      return hours * 60 + minutes;
+    }
+    
+    // Match 24-hour: e.g. 22:00, 14:30
+    const match24 = clean.match(/^(\d{1,2}):(\d{2})$/);
+    if (match24) {
+      const hours = parseInt(match24[1], 10);
+      const minutes = parseInt(match24[2], 10);
+      return hours * 60 + minutes;
+    }
+    
+    return null;
+  };
+
+  // Helper to add 1 day to YYYY-MM-DD string
+  const addDayToDateStr = (dateStr: string): string => {
+    try {
+      const d = new Date(dateStr + 'T00:00:00');
+      d.setDate(d.getDate() + 1);
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      return `${yyyy}-${mm}-${dd}`;
+    } catch (e) {
+      return dateStr;
+    }
+  };
+
+  const handleOpenAddEventModal = () => {
+    setEventTitle('');
+    setEventType('flight');
+    setEventDate(tripStartDate || new Date().toISOString().split('T')[0]);
+    setEventStartTime('');
+    setEventEndTime('');
+    setEventLatitude('');
+    setEventLongitude('');
+    setEventBookingReference('');
+    setEventDescription('');
+    setEventFormError('');
+    setIsAddEventModalVisible(true);
+  };
+
+  const handleSaveEvent = async () => {
+    if (!eventTitle.trim() || !eventType || !eventStartTime.trim() || !eventDate.trim()) {
+      setEventFormError(t('event.required_error') || 'Required fields missing');
+      return;
+    }
+
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(eventDate.trim())) {
+      setEventFormError('Date must be in YYYY-MM-DD format (e.g. 2026-07-21)');
+      return;
+    }
+
+    const latVal = eventLatitude ? parseFloat(eventLatitude) : undefined;
+    const lonVal = eventLongitude ? parseFloat(eventLongitude) : undefined;
+
+    if (eventLatitude && isNaN(latVal!)) {
+      setEventFormError(t('event.lat_error'));
+      return;
+    }
+    if (eventLongitude && isNaN(lonVal!)) {
+      setEventFormError(t('event.lon_error'));
+      return;
+    }
+
+    setEventFormError('');
+    setEventSaving(true);
+
+    try {
+      let endEventDate = eventDate;
+      const startMin = parseTimeToMinutes(eventStartTime);
+      const endMin = parseTimeToMinutes(eventEndTime);
+      if (startMin !== null && endMin !== null && endMin < startMin) {
+        endEventDate = addDayToDateStr(eventDate);
+      }
+
+      const combinedStart = `${eventDate} ${eventStartTime}`;
+      const combinedEnd = eventEndTime ? `${endEventDate} ${eventEndTime}` : '';
+
+      await createEvent(
+        tripId,
+        eventTitle.trim(),
+        eventType.toLowerCase(),
+        combinedStart,
+        combinedEnd,
+        latVal,
+        lonVal,
+        eventBookingReference?.trim() || undefined,
+        eventDescription?.trim() || undefined
+      );
+
+      // Refresh list
+      const updatedEvents = await getEventsForTrip(tripId);
+      setEvents(updatedEvents);
+
+      setIsAddEventModalVisible(false);
+    } catch (err: any) {
+      setEventFormError(err.message || 'Failed to save event.');
+    } finally {
+      setEventSaving(false);
+    }
+  };
+
+  const handleEventLocationSelected = (lat: number, lon: number) => {
+    setEventLatitude(lat.toString());
+    setEventLongitude(lon.toString());
   };
 
   // Web drag-and-drop events and file processors
@@ -662,7 +807,7 @@ export default function TripDashboardScreen() {
             <View style={[styles.webButtonRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
               <TouchableOpacity 
                 style={[styles.webActionBtn, styles.eventButton]}
-                onPress={() => navigation.navigate('AddEvent', { tripId })}
+                onPress={handleOpenAddEventModal}
                 activeOpacity={0.8}
               >
                 <Text style={styles.buttonText}>{t('dashboard.add_event')}</Text>
@@ -689,7 +834,7 @@ export default function TripDashboardScreen() {
           <View style={[styles.buttonRow, rowDirectionStyle]}>
             <TouchableOpacity 
               style={[styles.button, styles.eventButton]}
-              onPress={() => navigation.navigate('AddEvent', { tripId })}
+              onPress={handleOpenAddEventModal}
               activeOpacity={0.8}
             >
               <Text style={styles.buttonText}>{t('dashboard.add_event')}</Text>
@@ -737,6 +882,216 @@ export default function TripDashboardScreen() {
             >
               <Text style={styles.closeModalButtonText}>Close</Text>
             </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Add Event Modal Popup */}
+      <Modal
+        visible={isAddEventModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setIsAddEventModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.eventModalContainer}>
+            <ScrollView contentContainerStyle={{ paddingBottom: 20 }} showsVerticalScrollIndicator={false}>
+              <Text style={[styles.modalTitle, textAlignStyle]}>
+                {isRTL ? 'הוספת אירוע חדש' : 'Add New Event'}
+              </Text>
+              <Text style={[styles.modalSubtitle, textAlignStyle, { marginBottom: 10 }]}>
+                {isRTL ? 'ציין את פרטי האירוע ותאריכו' : 'Specify the event details and date'}
+              </Text>
+
+              {eventFormError ? (
+                <Text style={styles.modalFormErrorText}>{eventFormError}</Text>
+              ) : null}
+
+              {/* Title */}
+              <View style={{ marginBottom: 12 }}>
+                <Text style={[styles.modalFormLabel, textAlignStyle]}>
+                  {isRTL ? 'כותרת האירוע *' : 'Event Title *'}
+                </Text>
+                <TextInput
+                  style={[styles.modalFormInput, textAlignStyle]}
+                  placeholder={isRTL ? 'למשל: טיסת אל על ללונדון' : 'e.g. Flight to London'}
+                  value={eventTitle}
+                  onChangeText={setEventTitle}
+                  autoCapitalize="sentences"
+                />
+              </View>
+
+              {/* Type selector */}
+              <View style={{ marginBottom: 12 }}>
+                <Text style={[styles.modalFormLabel, textAlignStyle]}>
+                  {isRTL ? 'סוג אירוע *' : 'Event Type *'}
+                </Text>
+                <View style={[styles.modalFormTypeSelector, rowDirectionStyle]}>
+                  {[
+                    { label: `✈️ ${isRTL ? 'טיסה' : 'Flight'}`, value: 'flight' },
+                    { label: `🏨 ${isRTL ? 'מלון' : 'Hotel'}`, value: 'hotel' },
+                    { label: `📍 ${isRTL ? 'אטרקציה' : 'POI'}`, value: 'poi' },
+                  ].map((item) => (
+                    <TouchableOpacity
+                      key={item.value}
+                      style={[
+                        styles.modalFormTypeOption,
+                        eventType === item.value && styles.modalFormTypeOptionSelected,
+                      ]}
+                      onPress={() => setEventType(item.value)}
+                      activeOpacity={0.7}
+                    >
+                      <Text
+                        style={[
+                          styles.modalFormTypeOptionText,
+                          eventType === item.value && styles.modalFormTypeOptionTextSelected,
+                        ]}
+                      >
+                        {item.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              {/* Date */}
+              <View style={{ marginBottom: 12 }}>
+                <Text style={[styles.modalFormLabel, textAlignStyle]}>
+                  {isRTL ? 'תאריך אירוע (YYYY-MM-DD) *' : 'Event Date (YYYY-MM-DD) *'}
+                </Text>
+                <TextInput
+                  style={[styles.modalFormInput, textAlignStyle]}
+                  placeholder="YYYY-MM-DD"
+                  value={eventDate}
+                  onChangeText={setEventDate}
+                />
+              </View>
+
+              {/* Start & End Times */}
+              <View style={[styles.modalFormRow, rowDirectionStyle]}>
+                <View style={[styles.modalFormCol]}>
+                  <Text style={[styles.modalFormLabel, textAlignStyle]}>
+                    {isRTL ? 'שעת התחלה *' : 'Start Time *'}
+                  </Text>
+                  <TextInput
+                    style={[styles.modalFormInput, textAlignStyle]}
+                    placeholder="e.g. 10:30 AM / 22:30"
+                    value={eventStartTime}
+                    onChangeText={setEventStartTime}
+                  />
+                </View>
+                <View style={[styles.modalFormCol]}>
+                  <Text style={[styles.modalFormLabel, textAlignStyle]}>
+                    {isRTL ? 'שעת סיום' : 'End Time'}
+                  </Text>
+                  <TextInput
+                    style={[styles.modalFormInput, textAlignStyle]}
+                    placeholder="e.g. 02:00 AM / 14:00"
+                    value={eventEndTime}
+                    onChangeText={setEventEndTime}
+                  />
+                </View>
+              </View>
+
+              {/* Booking Reference */}
+              <View style={{ marginBottom: 12 }}>
+                <Text style={[styles.modalFormLabel, textAlignStyle]}>
+                  {isRTL ? 'סימוכין הזמנה' : 'Booking Reference'}
+                </Text>
+                <TextInput
+                  style={[styles.modalFormInput, textAlignStyle]}
+                  placeholder="e.g. AX79B"
+                  value={eventBookingReference}
+                  onChangeText={setEventBookingReference}
+                  autoCapitalize="characters"
+                />
+              </View>
+
+              {/* Latitude & Longitude */}
+              <View style={[styles.modalFormRow, rowDirectionStyle]}>
+                <View style={[styles.modalFormCol]}>
+                  <Text style={[styles.modalFormLabel, textAlignStyle]}>
+                    {isRTL ? 'קו רוחב' : 'Latitude'}
+                  </Text>
+                  <TextInput
+                    style={[styles.modalFormInput, textAlignStyle]}
+                    placeholder="e.g. 48.8566"
+                    value={eventLatitude}
+                    onChangeText={setEventLatitude}
+                    keyboardType="numeric"
+                  />
+                </View>
+                <View style={[styles.modalFormCol]}>
+                  <Text style={[styles.modalFormLabel, textAlignStyle]}>
+                    {isRTL ? 'קו אורך' : 'Longitude'}
+                  </Text>
+                  <TextInput
+                    style={[styles.modalFormInput, textAlignStyle]}
+                    placeholder="e.g. 2.3522"
+                    value={eventLongitude}
+                    onChangeText={setEventLongitude}
+                    keyboardType="numeric"
+                  />
+                </View>
+              </View>
+
+              {/* Interactive Map Picker */}
+              <View style={{ marginBottom: 12 }}>
+                <Text style={[styles.modalFormLabel, textAlignStyle]}>
+                  {isRTL ? 'סמן מיקום על המפה' : 'Pin location on map'}
+                </Text>
+                <MapPicker
+                  latitude={eventLatitude ? parseFloat(eventLatitude) : undefined}
+                  longitude={eventLongitude ? parseFloat(eventLongitude) : undefined}
+                  onSelectLocation={handleEventLocationSelected}
+                  lang={isRTL ? 'he' : 'en'}
+                  isRTL={isRTL}
+                  t={t}
+                />
+              </View>
+
+              {/* Additional Notes / Description */}
+              <View style={{ marginBottom: 12 }}>
+                <Text style={[styles.modalFormLabel, textAlignStyle]}>
+                  {isRTL ? 'הערות נוספות' : 'Additional Notes'}
+                </Text>
+                <TextInput
+                  style={[styles.modalFormInput, styles.modalFormMultilineInput, textAlignStyle]}
+                  placeholder={isRTL ? 'פרטים נוספים כגון טרמינל, הנחיות...' : 'Additional details, terminal, directions...'}
+                  value={eventDescription}
+                  onChangeText={setEventDescription}
+                  multiline={true}
+                  numberOfLines={4}
+                />
+              </View>
+
+              {/* Buttons */}
+              <TouchableOpacity
+                style={styles.modalSaveBtn}
+                onPress={handleSaveEvent}
+                disabled={eventSaving}
+                activeOpacity={0.8}
+              >
+                {eventSaving ? (
+                  <ActivityIndicator color="#ffffff" />
+                ) : (
+                  <Text style={styles.modalSaveBtnText}>
+                    {isRTL ? 'שמור אירוע' : 'Save Event'}
+                  </Text>
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.modalCancelBtn}
+                onPress={() => setIsAddEventModalVisible(false)}
+                disabled={eventSaving}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.modalCancelBtnText}>
+                  {isRTL ? 'ביטול' : 'Cancel'}
+                </Text>
+              </TouchableOpacity>
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -1373,5 +1728,108 @@ const styles = StyleSheet.create({
     color: colors.white,
     fontWeight: typography.weights.bold,
     fontSize: typography.sizes.md,
+  },
+  eventModalContainer: {
+    backgroundColor: colors.card,
+    borderRadius: 16,
+    padding: 20,
+    width: '90%',
+    maxWidth: 500,
+    maxHeight: '90%',
+    shadowColor: colors.text,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 5,
+  },
+  modalFormLabel: {
+    fontFamily: typography.fontFamily,
+    fontSize: typography.sizes.sm,
+    fontWeight: typography.weights.bold,
+    color: colors.text,
+    marginBottom: 6,
+    marginTop: 12,
+  },
+  modalFormInput: {
+    fontFamily: typography.fontFamily,
+    fontSize: typography.sizes.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: '#f8f9fa',
+    color: colors.text,
+  },
+  modalFormMultilineInput: {
+    height: 80,
+    textAlignVertical: 'top',
+  },
+  modalFormRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  modalFormCol: {
+    flex: 1,
+  },
+  modalFormErrorText: {
+    color: '#fa5252',
+    fontFamily: typography.fontFamily,
+    fontSize: typography.sizes.sm,
+    marginBottom: 10,
+  },
+  modalFormTypeSelector: {
+    flexDirection: 'row',
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    overflow: 'hidden',
+    marginBottom: 8,
+  },
+  modalFormTypeOption: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    backgroundColor: '#f8f9fa',
+  },
+  modalFormTypeOptionSelected: {
+    backgroundColor: colors.primary,
+  },
+  modalFormTypeOptionText: {
+    fontFamily: typography.fontFamily,
+    fontSize: typography.sizes.sm,
+    color: colors.textLight,
+  },
+  modalFormTypeOptionTextSelected: {
+    color: colors.white,
+    fontWeight: typography.weights.bold,
+  },
+  modalSaveBtn: {
+    backgroundColor: colors.primary,
+    height: 48,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 20,
+  },
+  modalSaveBtnText: {
+    color: colors.white,
+    fontFamily: typography.fontFamily,
+    fontSize: typography.sizes.md,
+    fontWeight: typography.weights.bold,
+  },
+  modalCancelBtn: {
+    backgroundColor: '#f1f3f5',
+    height: 44,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 10,
+  },
+  modalCancelBtnText: {
+    color: '#495057',
+    fontFamily: typography.fontFamily,
+    fontSize: typography.sizes.md,
+    fontWeight: typography.weights.bold,
   },
 });
