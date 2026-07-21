@@ -23,6 +23,7 @@ import { RootStackParamList } from '../navigation/AppNavigator';
 import { getEventsForTrip, getExpensesForTrip, getDocumentsForTrip, saveDocument, getTrip, createEvent } from '../services/dbService';
 import { uploadTripDocument } from '../services/storageService';
 import { geocodeAddress } from '../services/geocodingService';
+import { fetchRouteDirections } from '../services/directionsService';
 import { getCachedOrDownloadFile, isFileCached } from '../services/fileCacheService';
 import { Event, Expense, Document, Trip } from '../types';
 import { useNetworkState } from '../hooks/useNetworkState';
@@ -117,6 +118,12 @@ export default function TripDashboardScreen() {
   // Expandable Hotel Accordion State
   const [expandedHotelIds, setExpandedHotelIds] = useState<Record<string, boolean>>({});
   const [focusedEventId, setFocusedEventId] = useState<string | null>(null);
+
+  // Waypoint & QR States
+  const [isWaypointQrModalVisible, setIsWaypointQrModalVisible] = useState(false);
+  const [selectedQrCodeVal, setSelectedQrCodeVal] = useState<string | null>(null);
+  const [eventQrCodeUrl, setEventQrCodeUrl] = useState('');
+  const [eventTransportMode, setEventTransportMode] = useState<'driving' | 'transit' | ''>('');
 
   const toggleHotelAccordion = (id: string) => {
     setExpandedHotelIds((prev) => ({
@@ -371,6 +378,8 @@ export default function TripDashboardScreen() {
     setEventHotelUrl('');
     setEventCheckInTime('');
     setEventCheckOutTime('');
+    setEventQrCodeUrl('');
+    setEventTransportMode('');
     setEventFormError('');
     setIsAddEventModalVisible(true);
   };
@@ -465,6 +474,43 @@ export default function TripDashboardScreen() {
       const combinedStart = `${eventDate} ${eventStartTime}`;
       const combinedEnd = eventEndTime ? `${endEventDate} ${eventEndTime}` : '';
 
+      let finalDistance: number | undefined = undefined;
+      let finalDurationText: string | undefined = undefined;
+      let finalRoutePolyline: string | undefined = undefined;
+
+      if (eventType.toLowerCase() === 'waypoint' && eventTransportMode && finalLat !== undefined && finalLon !== undefined) {
+        try {
+          const existingEvents = await getEventsForTrip(tripId);
+          const sortedEvents = [...existingEvents].sort((a, b) => a.startTime.localeCompare(b.startTime));
+          
+          let prevEvent = null;
+          for (const ev of sortedEvents) {
+            if (ev.startTime < combinedStart) {
+              prevEvent = ev;
+            } else {
+              break;
+            }
+          }
+
+          if (prevEvent && typeof prevEvent.latitude === 'number' && typeof prevEvent.longitude === 'number') {
+            const routeResult = await fetchRouteDirections(
+              prevEvent.latitude,
+              prevEvent.longitude,
+              finalLat,
+              finalLon,
+              eventTransportMode as 'driving' | 'transit'
+            );
+            if (routeResult) {
+              finalDistance = routeResult.distanceMeters;
+              finalDurationText = routeResult.durationText;
+              finalRoutePolyline = routeResult.encodedPolyline;
+            }
+          }
+        } catch (dirErr) {
+          console.error('Error calculating route directions:', dirErr);
+        }
+      }
+
       await createEvent(
         tripId,
         eventTitle.trim(),
@@ -486,14 +532,15 @@ export default function TripDashboardScreen() {
         eventCheckOutTime.trim() || undefined,
         undefined,
         undefined,
-        undefined,
-        undefined,
-        undefined,
-        undefined,
+        finalDistance,
+        finalDurationText,
+        eventQrCodeUrl.trim() || undefined,
+        eventTransportMode || undefined,
         costVal,
         originLatVal,
         originLonVal,
-        eventAddress.trim() || undefined
+        eventAddress.trim() || undefined,
+        finalRoutePolyline
       );
 
       // Refresh list
@@ -708,6 +755,7 @@ export default function TripDashboardScreen() {
     const weather = getWeatherForEvent(item);
     const isFlight = item.type === 'flight';
     const isHotel = item.type === 'hotel';
+    const isWaypoint = item.type === 'waypoint';
 
     return (
       <View style={[styles.eventCard, { alignItems: isRTL ? 'flex-end' : 'flex-start' }]}>
@@ -883,6 +931,67 @@ export default function TripDashboardScreen() {
               )}
             </View>
           )
+        ) : isWaypoint ? (
+          <View style={{ width: '100%' }}>
+            <View style={[styles.eventHeader, rowDirectionStyle]}>
+              <Text style={[styles.eventTitle, textAlignStyle]}>{item.title}</Text>
+              <View style={[styles.badge, { backgroundColor: '#fff9db', alignSelf: 'center', marginRight: isRTL ? 0 : 6, marginLeft: isRTL ? 6 : 0 }]}>
+                <Text style={[styles.badgeText, { color: '#f08c00' }]}>
+                  {isRTL ? 'נקודת ציון' : 'WAYPOINT'}
+                </Text>
+              </View>
+              {!isWeb && weather && (
+                <View style={[styles.mobileWeatherWidget, { marginLeft: isRTL ? 8 : 'auto', marginRight: isRTL ? 'auto' : 8 }]}>
+                  <Text style={styles.mobileWeatherText}>
+                    {getWeatherEmoji(weather.status)} {weather.temp}°C
+                  </Text>
+                </View>
+              )}
+            </View>
+
+            <Text style={[styles.eventTime, textAlignStyle]}>
+              ⏰  {item.startTime} {item.endTime ? (isRTL ? `עד ${item.endTime}` : `to ${item.endTime}`) : ''}
+            </Text>
+
+            {item.transportMode && item.distance && item.estimatedTravelTime ? (
+              <View style={[styles.waypointRouteBadge, rowDirectionStyle]}>
+                <Text style={styles.waypointRouteText}>
+                  {item.transportMode === 'driving' ? '🚗' : '🚌'} {isRTL ? 'מרחק:' : 'Distance:'} {(item.distance / 1000).toFixed(1)} km  •  {isRTL ? 'זמן נסיעה:' : 'Est. Time:'} {item.estimatedTravelTime}
+                </Text>
+              </View>
+            ) : null}
+
+            {item.description ? (
+              <View style={styles.waypointDescriptionContainer}>
+                <Text style={[styles.waypointDescriptionText, textAlignStyle]}>
+                  📝 {item.description}
+                </Text>
+              </View>
+            ) : null}
+
+            <View style={[styles.waypointActionsRow, rowDirectionStyle, { marginTop: 10 }]}>
+              <TouchableOpacity
+                style={styles.waypointQrBtn}
+                onPress={() => {
+                  setSelectedQrCodeVal(item.qrCodeUrl || item.title);
+                  setIsWaypointQrModalVisible(true);
+                }}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.waypointQrBtnText}>🎫 {isRTL ? 'הצג קוד QR' : 'View QR Code'}</Text>
+              </TouchableOpacity>
+
+              {hasCoordinates && !isWeb && (
+                <TouchableOpacity
+                  style={[styles.mobileHotelNavBtn, { flex: 1, paddingVertical: 8, marginLeft: isRTL ? 0 : 8, marginRight: isRTL ? 8 : 0 }]}
+                  onPress={() => handleQuickNavigate(item.latitude, item.longitude, item.id)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.mobileHotelNavBtnText}>🗺️ {isRTL ? 'מפה' : 'Show on Map'}</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
         ) : (
           <>
             <View style={[styles.eventHeader, rowDirectionStyle]}>
@@ -1306,6 +1415,36 @@ export default function TripDashboardScreen() {
         </View>
       </Modal>
 
+      {/* Waypoint QR Code Modal */}
+      <Modal
+        visible={isWaypointQrModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setIsWaypointQrModalVisible(false)}
+      >
+        <View style={styles.fullScreenQrOverlay}>
+          <TouchableOpacity 
+            style={styles.fullScreenQrCloseArea}
+            onPress={() => setIsWaypointQrModalVisible(false)}
+          />
+          <View style={styles.fullScreenQrContainer}>
+            <Text style={styles.fullScreenQrTitle}>{isRTL ? 'קוד QR של נקודת הציון' : 'Waypoint QR Code'}</Text>
+            {selectedQrCodeVal ? (
+              <View style={styles.fullScreenQrWrapper}>
+                <QRCode value={selectedQrCodeVal} size={240} />
+              </View>
+            ) : null}
+            <TouchableOpacity 
+              style={styles.fullScreenQrCloseBtn} 
+              onPress={() => setIsWaypointQrModalVisible(false)}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.fullScreenQrCloseBtnText}>{isRTL ? 'סגור' : 'Close'}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
       {/* Add Event Modal Popup */}
       <Modal
         visible={isAddEventModalVisible}
@@ -1675,7 +1814,55 @@ export default function TripDashboardScreen() {
                   </View>
                 </View>
               ) : (
-                <>
+                <View style={{ marginTop: 8, borderTopWidth: 1, borderTopColor: '#dee2e6', paddingTop: 12 }}>
+                  <Text style={[styles.modalFormLabel, textAlignStyle, { fontWeight: 'bold', fontSize: 14, marginBottom: 8, color: '#f08c00' }]}>
+                    {isRTL ? 'פרטי נקודת ציון' : 'Waypoint Details'}
+                  </Text>
+
+                  <View style={{ marginBottom: 12 }}>
+                    <Text style={[styles.modalFormLabel, textAlignStyle]}>
+                      {isRTL ? 'ערך קוד QR (אופציונלי)' : 'QR Code Value / URL (Optional)'}
+                    </Text>
+                    <TextInput
+                      style={[styles.modalFormInput, textAlignStyle]}
+                      placeholder={isRTL ? 'למשל: פרטי כרטיס או קישור' : 'e.g. ticket details or QR URL'}
+                      value={eventQrCodeUrl}
+                      onChangeText={setEventQrCodeUrl}
+                    />
+                  </View>
+
+                  <View style={{ marginBottom: 12 }}>
+                    <Text style={[styles.modalFormLabel, textAlignStyle]}>
+                      {isRTL ? 'אמצעי תחבורה ממיקום קודם' : 'Transport Mode from Previous Location'}
+                    </Text>
+                    <View style={[styles.modalFormTypeSelector, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                      {[
+                        { label: isRTL ? 'ללא' : 'None', value: '' },
+                        { label: isRTL ? '🚗 רכב' : '🚗 Driving', value: 'driving' },
+                        { label: isRTL ? '🚌 תחבורה' : '🚌 Transit', value: 'transit' },
+                      ].map((item) => (
+                        <TouchableOpacity
+                          key={item.value}
+                          style={[
+                            styles.modalFormTypeOption,
+                            eventTransportMode === item.value && styles.modalFormTypeOptionSelected,
+                          ]}
+                          onPress={() => setEventTransportMode(item.value as 'driving' | 'transit' | '')}
+                          activeOpacity={0.7}
+                        >
+                          <Text
+                            style={[
+                              styles.modalFormTypeOptionText,
+                              eventTransportMode === item.value && styles.modalFormTypeOptionTextSelected,
+                            ]}
+                          >
+                             {item.label}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </View>
+
                   {/* Latitude & Longitude */}
                   <View style={[styles.modalFormRow, rowDirectionStyle]}>
                     <View style={[styles.modalFormCol]}>
@@ -1718,7 +1905,7 @@ export default function TripDashboardScreen() {
                       t={t}
                     />
                   </View>
-                </>
+                </View>
               )}
 
               {/* Additional Notes / Description */}
@@ -2854,5 +3041,109 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.sm,
     fontWeight: typography.weights.bold,
     color: colors.primary,
+  },
+  waypointRouteBadge: {
+    backgroundColor: '#fff4e6',
+    borderRadius: 8,
+    padding: 10,
+    marginTop: 6,
+    borderWidth: 1,
+    borderColor: '#ffe8cc',
+    width: '100%',
+  },
+  waypointRouteText: {
+    fontFamily: typography.fontFamily,
+    fontSize: typography.sizes.sm,
+    color: '#d9480f',
+    fontWeight: typography.weights.bold,
+  },
+  waypointDescriptionContainer: {
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    padding: 12,
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+    width: '100%',
+  },
+  waypointDescriptionText: {
+    fontFamily: typography.fontFamily,
+    fontSize: typography.sizes.sm,
+    color: colors.text,
+    lineHeight: 20,
+  },
+  waypointActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+  },
+  waypointQrBtn: {
+    flex: 1,
+    backgroundColor: '#fff3bf',
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#ffd43b',
+  },
+  waypointQrBtnText: {
+    fontFamily: typography.fontFamily,
+    fontSize: typography.sizes.sm,
+    fontWeight: typography.weights.bold,
+    color: '#e67700',
+  },
+  fullScreenQrOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.85)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fullScreenQrCloseArea: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+  },
+  fullScreenQrContainer: {
+    width: 320,
+    backgroundColor: colors.white,
+    borderRadius: 16,
+    padding: 24,
+    alignItems: 'center',
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+  },
+  fullScreenQrTitle: {
+    fontFamily: typography.fontFamily,
+    fontSize: typography.sizes.md,
+    fontWeight: typography.weights.bold,
+    color: colors.text,
+    marginBottom: 16,
+  },
+  fullScreenQrWrapper: {
+    padding: 10,
+    backgroundColor: colors.white,
+    borderRadius: 8,
+    marginBottom: 20,
+  },
+  fullScreenQrCloseBtn: {
+    backgroundColor: colors.primary,
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 24,
+    width: '100%',
+    alignItems: 'center',
+  },
+  fullScreenQrCloseBtnText: {
+    fontFamily: typography.fontFamily,
+    fontSize: typography.sizes.md,
+    fontWeight: typography.weights.bold,
+    color: colors.white,
   },
 });

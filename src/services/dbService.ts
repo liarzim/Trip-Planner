@@ -158,7 +158,8 @@ export const createEvent = async (
   cost?: number,
   originLatitude?: number,
   originLongitude?: number,
-  address?: string
+  address?: string,
+  routePolyline?: string
 ): Promise<Event> => {
   const eventsCollection = collection(db, 'events');
   const data: any = {
@@ -191,6 +192,7 @@ export const createEvent = async (
   if (originLatitude !== undefined) data.originLatitude = originLatitude;
   if (originLongitude !== undefined) data.originLongitude = originLongitude;
   if (address !== undefined) data.address = address;
+  if (routePolyline !== undefined) data.routePolyline = routePolyline;
 
   const docRef = await addDoc(eventsCollection, data);
 
@@ -224,6 +226,7 @@ export const createEvent = async (
     originLatitude,
     originLongitude,
     address,
+    routePolyline,
   };
 };
 
@@ -265,6 +268,7 @@ export const getEventsForTrip = async (tripId: string): Promise<Event[]> => {
       distance: data.distance,
       estimatedTravelTime: data.estimatedTravelTime,
       qrCodeUrl: data.qrCodeUrl,
+      routePolyline: data.routePolyline,
       transportMode: data.transportMode,
       cost: data.cost,
     } as Event;

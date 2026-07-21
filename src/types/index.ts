@@ -60,6 +60,7 @@ export interface Event {
   distance?: number;
   estimatedTravelTime?: string;
   qrCodeUrl?: string;
+  routePolyline?: string;
   transportMode?: string;
   cost?: number;
 }

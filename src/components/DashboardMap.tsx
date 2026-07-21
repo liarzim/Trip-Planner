@@ -50,6 +50,42 @@ function getGeodesicPoints(start: Coordinate, end: Coordinate, numPoints: number
   return points;
 }
 
+/**
+ * Decodes a Google overview polyline string into an array of LatLng coordinates.
+ */
+function decodePolyline(encoded: string): Coordinate[] {
+  const points: Coordinate[] = [];
+  let index = 0, len = encoded.length;
+  let lat = 0, lng = 0;
+
+  while (index < len) {
+    let b, shift = 0, result = 0;
+    do {
+      b = encoded.charCodeAt(index++) - 63;
+      result |= (b & 0x1f) << shift;
+      shift += 5;
+    } while (b >= 0x20);
+    const dlat = ((result & 1) ? ~(result >> 1) : (result >> 1));
+    lat += dlat;
+
+    shift = 0;
+    result = 0;
+    do {
+      b = encoded.charCodeAt(index++) - 63;
+      result |= (b & 0x1f) << shift;
+      shift += 5;
+    } while (b >= 0x20);
+    const dlng = ((result & 1) ? ~(result >> 1) : (result >> 1));
+    lng += dlng;
+
+    points.push({
+      latitude: (lat / 1E5),
+      longitude: (lng / 1E5)
+    });
+  }
+  return points;
+}
+
 function getBearing(start: Coordinate, end: Coordinate): number {
   const lat1 = toRadians(start.latitude);
   const lon1 = toRadians(start.longitude);
@@ -242,6 +278,26 @@ export default function DashboardMap({ events, focusedEventId }: DashboardMapPro
                 </Marker>
               </React.Fragment>
             );
+          }
+          return null;
+        })}
+
+        {/* Saved Static Waypoint Route Polylines */}
+        {geoEvents.map((item) => {
+          if (item.routePolyline) {
+            try {
+              const decodedCoords = decodePolyline(item.routePolyline);
+              return (
+                <Polyline
+                  key={`route-polyline-${item.id}`}
+                  coordinates={decodedCoords}
+                  strokeColor="#ff922b"
+                  strokeWidth={5}
+                />
+              );
+            } catch (err) {
+              console.error('Error rendering decoded polyline:', err);
+            }
           }
           return null;
         })}
