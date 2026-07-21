@@ -41,6 +41,8 @@ export interface Event {
   endTime: string;
   latitude?: number;
   longitude?: number;
+  originLatitude?: number;
+  originLongitude?: number;
   bookingReference?: string;
   description?: string;
   flightNumber?: string;

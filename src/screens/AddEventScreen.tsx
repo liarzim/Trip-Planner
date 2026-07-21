@@ -41,10 +41,45 @@ export default function AddEventScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  const parseTimeToMinutes = (timeStr: string): number | null => {
+    if (!timeStr) return null;
+    const clean = timeStr.trim().toLowerCase();
+    
+    // Match 12-hour: e.g. 10:00 pm, 08:30 am
+    const match12 = clean.match(/^(\d{1,2}):(\d{2})\s*(am|pm)$/);
+    if (match12) {
+      let hours = parseInt(match12[1], 10);
+      const minutes = parseInt(match12[2], 10);
+      const ampm = match12[3];
+      if (ampm === 'pm' && hours < 12) hours += 12;
+      if (ampm === 'am' && hours === 12) hours = 0;
+      return hours * 60 + minutes;
+    }
+    
+    // Match 24-hour: e.g. 22:00, 14:30
+    const match24 = clean.match(/^(\d{1,2}):(\d{2})$/);
+    if (match24) {
+      const hours = parseInt(match24[1], 10);
+      const minutes = parseInt(match24[2], 10);
+      return hours * 60 + minutes;
+    }
+    
+    return null;
+  };
+
   const handleSave = async () => {
     if (!title || !type || !startTime) {
       setError(t('event.required_error'));
       return;
+    }
+
+    if (type.toLowerCase() === 'flight') {
+      const depMin = parseTimeToMinutes(startTime);
+      const arrMin = parseTimeToMinutes(endTime);
+      if (depMin !== null && arrMin !== null && arrMin <= depMin) {
+        setError(isRTL ? 'שעת ההגעה חייבת להיות אחרי שעת ההמראה' : 'Arrival time must be strictly after departure time');
+        return;
+      }
     }
 
     const latVal = latitude ? parseFloat(latitude) : undefined;

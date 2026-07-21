@@ -155,7 +155,9 @@ export const createEvent = async (
   estimatedTravelTime?: string,
   qrCodeUrl?: string,
   transportMode?: string,
-  cost?: number
+  cost?: number,
+  originLatitude?: number,
+  originLongitude?: number
 ): Promise<Event> => {
   const eventsCollection = collection(db, 'events');
   const data: any = {
@@ -185,6 +187,8 @@ export const createEvent = async (
   if (qrCodeUrl !== undefined) data.qrCodeUrl = qrCodeUrl;
   if (transportMode !== undefined) data.transportMode = transportMode;
   if (cost !== undefined) data.cost = cost;
+  if (originLatitude !== undefined) data.originLatitude = originLatitude;
+  if (originLongitude !== undefined) data.originLongitude = originLongitude;
 
   const docRef = await addDoc(eventsCollection, data);
 
@@ -215,6 +219,8 @@ export const createEvent = async (
     qrCodeUrl,
     transportMode,
     cost,
+    originLatitude,
+    originLongitude,
   };
 };
 
@@ -237,6 +243,8 @@ export const getEventsForTrip = async (tripId: string): Promise<Event[]> => {
       endTime: data.endTime,
       latitude: data.latitude,
       longitude: data.longitude,
+      originLatitude: data.originLatitude,
+      originLongitude: data.originLongitude,
       bookingReference: data.bookingReference,
       description: data.description,
       flightNumber: data.flightNumber,

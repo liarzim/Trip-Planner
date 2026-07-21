@@ -97,6 +97,16 @@ export default function TripDashboardScreen() {
   const [eventSaving, setEventSaving] = useState(false);
   const [eventFormError, setEventFormError] = useState('');
 
+  // Flight Specific Form States
+  const [eventAirline, setEventAirline] = useState('');
+  const [eventFlightNumber, setEventFlightNumber] = useState('');
+  const [eventDepartureTime, setEventDepartureTime] = useState('');
+  const [eventArrivalTime, setEventArrivalTime] = useState('');
+  const [eventOriginAirport, setEventOriginAirport] = useState('');
+  const [eventDestinationAirport, setEventDestinationAirport] = useState('');
+  const [eventOriginLatitude, setEventOriginLatitude] = useState('');
+  const [eventOriginLongitude, setEventOriginLongitude] = useState('');
+
   // Daily Checklist State
   const [checklist, setChecklist] = useState<ChecklistItem[]>([
     { id: '1', text: 'Pack tickets & passports', completed: false },
@@ -319,6 +329,14 @@ export default function TripDashboardScreen() {
     setEventBookingReference('');
     setEventDescription('');
     setEventCost('');
+    setEventAirline('');
+    setEventFlightNumber('');
+    setEventDepartureTime('');
+    setEventArrivalTime('');
+    setEventOriginAirport('');
+    setEventDestinationAirport('');
+    setEventOriginLatitude('');
+    setEventOriginLongitude('');
     setEventFormError('');
     setIsAddEventModalVisible(true);
   };
@@ -346,10 +364,42 @@ export default function TripDashboardScreen() {
       return;
     }
 
+    const originLatVal = eventOriginLatitude ? parseFloat(eventOriginLatitude) : undefined;
+    const originLonVal = eventOriginLongitude ? parseFloat(eventOriginLongitude) : undefined;
+
+    if (eventOriginLatitude && isNaN(originLatVal!)) {
+      setEventFormError(isRTL ? 'קו רוחב מוצא לא תקין' : 'Origin latitude must be a valid number');
+      return;
+    }
+    if (eventOriginLongitude && isNaN(originLonVal!)) {
+      setEventFormError(isRTL ? 'קו אורך מוצא לא תקין' : 'Origin longitude must be a valid number');
+      return;
+    }
+
     const costVal = eventCost ? parseFloat(eventCost) : undefined;
     if (eventCost && isNaN(costVal!)) {
       setEventFormError(isRTL ? 'העלות חייבת להיות מספר תקין' : 'Cost must be a valid number');
       return;
+    }
+
+    // Step 4: Flight Specific Input Validations
+    if (eventType.toLowerCase() === 'flight') {
+      const depTimeClean = eventDepartureTime.trim() || eventStartTime.trim();
+      const arrTimeClean = eventArrivalTime.trim() || eventEndTime.trim();
+      const depMin = parseTimeToMinutes(depTimeClean);
+      const arrMin = parseTimeToMinutes(arrTimeClean);
+      
+      if (depMin !== null && arrMin !== null && arrMin <= depMin) {
+        setEventFormError(isRTL ? 'שעת ההגעה חייבת להיות אחרי שעת ההמראה' : 'Arrival time must be strictly after departure time');
+        return;
+      }
+
+      const originCode = eventOriginAirport.trim().toUpperCase();
+      const destCode = eventDestinationAirport.trim().toUpperCase();
+      if (originCode && destCode && originCode === destCode) {
+        setEventFormError(isRTL ? 'שדה תעופה מוצא ויעד אינם יכולים להיות זהים' : 'Origin and destination airports cannot be identical');
+        return;
+      }
     }
 
     setEventFormError('');
@@ -376,10 +426,16 @@ export default function TripDashboardScreen() {
         lonVal,
         eventBookingReference?.trim() || undefined,
         eventDescription?.trim() || undefined,
+        eventFlightNumber.trim() || undefined,
+        eventAirline.trim() || undefined,
+        eventDepartureTime.trim() || undefined,
+        eventArrivalTime.trim() || undefined,
+        eventOriginAirport.trim().toUpperCase() || undefined,
+        eventDestinationAirport.trim().toUpperCase() || undefined,
         undefined, undefined, undefined, undefined, undefined,
-        undefined, undefined, undefined, undefined, undefined,
-        undefined, undefined, undefined, undefined, undefined,
-        costVal
+        undefined, undefined, undefined, undefined, costVal,
+        originLatVal,
+        originLonVal
       );
 
       // Refresh list
@@ -592,52 +648,143 @@ export default function TripDashboardScreen() {
     const textAlignStyle = { textAlign: (isRTL ? 'right' : 'left') as 'left' | 'right' };
     const alignSelfStyle = { alignSelf: (isRTL ? 'flex-end' : 'flex-start') as 'flex-start' | 'flex-end' };
     const weather = getWeatherForEvent(item);
+    const isFlight = item.type === 'flight';
 
     return (
       <View style={[styles.eventCard, { alignItems: isRTL ? 'flex-end' : 'flex-start' }]}>
-        <View style={[styles.eventHeader, rowDirectionStyle]}>
-          <Text style={[styles.eventTitle, textAlignStyle]}>{item.title}</Text>
-          <View style={[styles.badge, { backgroundColor: badge.bg, alignSelf: 'center', marginRight: isRTL ? 0 : 6, marginLeft: isRTL ? 6 : 0 }]}>
-            <Text style={[styles.badgeText, { color: badge.text }]}>
-              {t(`event.${item.type.toLowerCase()}`).toUpperCase()}
-            </Text>
-          </View>
-          {!isWeb && weather && (
-            <View style={[styles.mobileWeatherWidget, { marginLeft: isRTL ? 8 : 'auto', marginRight: isRTL ? 'auto' : 8 }]}>
-              <Text style={styles.mobileWeatherText}>
-                {getWeatherEmoji(weather.status)} {weather.temp}°C
-              </Text>
+        {isFlight ? (
+          isWeb ? (
+            <View style={[styles.webFlightRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+              <View style={[styles.webFlightBadgeCol, rowDirectionStyle]}>
+                <Text style={styles.webFlightEmoji}>✈️</Text>
+                <View style={{ marginLeft: isRTL ? 0 : 8, marginRight: isRTL ? 8 : 0 }}>
+                  <Text style={[styles.webFlightAirline, textAlignStyle]}>{item.airline || (isRTL ? 'טיסה' : 'Flight')}</Text>
+                  <Text style={[styles.webFlightNumber, textAlignStyle]}>{item.flightNumber || 'FLIGHT'}</Text>
+                </View>
+              </View>
+
+              <View style={[styles.webFlightTimeline, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                <View style={styles.webFlightTimePoint}>
+                  <Text style={styles.webFlightTime}>{item.departureTime || item.startTime.split(' ')[1] || item.startTime}</Text>
+                  <Text style={styles.webFlightAirport}>{item.originAirport || 'TLV'}</Text>
+                </View>
+                <View style={styles.webFlightConnector}>
+                  <View style={styles.webFlightDot} />
+                  <View style={styles.webFlightLine} />
+                  <Text style={styles.webFlightMidplane}>✈️</Text>
+                  <View style={styles.webFlightLine} />
+                  <View style={styles.webFlightDot} />
+                </View>
+                <View style={styles.webFlightTimePoint}>
+                  <Text style={styles.webFlightTime}>{item.arrivalTime || item.endTime.split(' ')[1] || item.endTime}</Text>
+                  <Text style={styles.webFlightAirport}>{item.destinationAirport || 'LHR'}</Text>
+                </View>
+              </View>
+
+              {item.bookingReference ? (
+                <View style={styles.webFlightInfoBox}>
+                  <Text style={styles.webFlightInfoLabel}>{isRTL ? 'סימוכין' : 'Booking Ref'}</Text>
+                  <Text style={styles.webFlightInfoValue}>{item.bookingReference}</Text>
+                </View>
+              ) : null}
+
+              {typeof item.cost === 'number' && (
+                <View style={styles.webFlightInfoBox}>
+                  <Text style={styles.webFlightInfoLabel}>{isRTL ? 'עלות' : 'Cost'}</Text>
+                  <Text style={styles.webFlightCostVal}>{item.cost.toFixed(2)} {tripBaseCurrency}</Text>
+                  {typeof tripExchangeRate === 'number' && (
+                    <Text style={styles.webFlightCostConverted}>₪{(item.cost * tripExchangeRate).toFixed(2)}</Text>
+                  )}
+                </View>
+              )}
             </View>
-          )}
-        </View>
-        
-        <Text style={[styles.eventTime, textAlignStyle]}>
-          ⏰  {item.startTime} {item.endTime ? (isRTL ? `עד ${item.endTime}` : `to ${item.endTime}`) : ''}
-        </Text>
+          ) : (
+            <View style={styles.mobileFlightRow}>
+              <View style={[styles.mobileFlightHeaderRow, rowDirectionStyle]}>
+                <Text style={styles.mobileFlightTimeLarge}>
+                  {item.departureTime || item.startTime.split(' ')[1] || item.startTime}
+                </Text>
+                <View style={[styles.badge, { backgroundColor: badge.bg, alignSelf: 'center', marginRight: isRTL ? 0 : 6, marginLeft: isRTL ? 6 : 0 }]}>
+                  <Text style={[styles.badgeText, { color: badge.text }]}>✈️ FLIGHT</Text>
+                </View>
+                {weather && (
+                  <View style={[styles.mobileWeatherWidget, { marginLeft: isRTL ? 8 : 'auto', marginRight: isRTL ? 'auto' : 8 }]}>
+                    <Text style={styles.mobileWeatherText}>
+                      {getWeatherEmoji(weather.status)} {weather.temp}°C
+                    </Text>
+                  </View>
+                )}
+              </View>
 
-        {typeof item.cost === 'number' && (
-          <View style={[rowDirectionStyle, { alignItems: 'center', marginVertical: 4 }]}>
-            <Text style={[styles.eventCostText, textAlignStyle]}>
-              💰 {item.cost.toFixed(2)} {tripBaseCurrency}
+              <View style={[styles.mobileFlightRouteRow, rowDirectionStyle]}>
+                <Text style={styles.mobileFlightRouteText}>
+                  {item.originAirport || 'TLV'} ➔ {item.destinationAirport || 'LHR'}
+                </Text>
+                <Text style={styles.mobileFlightAirlineText}>
+                  {item.airline || 'Flight'} {item.flightNumber || ''}
+                </Text>
+              </View>
+
+              {typeof item.cost === 'number' && (
+                <View style={[rowDirectionStyle, { alignItems: 'center', marginTop: 4 }]}>
+                  <Text style={styles.eventCostText}>
+                    💰 {item.cost.toFixed(2)} {tripBaseCurrency}
+                  </Text>
+                  {typeof tripExchangeRate === 'number' && (
+                    <Text style={styles.eventCostConvertedText}>
+                      {'  '}(₪{(item.cost * tripExchangeRate).toFixed(2)})
+                    </Text>
+                  )}
+                </View>
+              )}
+            </View>
+          )
+        ) : (
+          <>
+            <View style={[styles.eventHeader, rowDirectionStyle]}>
+              <Text style={[styles.eventTitle, textAlignStyle]}>{item.title}</Text>
+              <View style={[styles.badge, { backgroundColor: badge.bg, alignSelf: 'center', marginRight: isRTL ? 0 : 6, marginLeft: isRTL ? 6 : 0 }]}>
+                <Text style={[styles.badgeText, { color: badge.text }]}>
+                  {t(`event.${item.type.toLowerCase()}`).toUpperCase()}
+                </Text>
+              </View>
+              {!isWeb && weather && (
+                <View style={[styles.mobileWeatherWidget, { marginLeft: isRTL ? 8 : 'auto', marginRight: isRTL ? 'auto' : 8 }]}>
+                  <Text style={styles.mobileWeatherText}>
+                    {getWeatherEmoji(weather.status)} {weather.temp}°C
+                  </Text>
+                </View>
+              )}
+            </View>
+            
+            <Text style={[styles.eventTime, textAlignStyle]}>
+              ⏰  {item.startTime} {item.endTime ? (isRTL ? `עד ${item.endTime}` : `to ${item.endTime}`) : ''}
             </Text>
-            {typeof tripExchangeRate === 'number' && (
-              <Text style={styles.eventCostConvertedText}>
-                {'  '}(₪{(item.cost * tripExchangeRate).toFixed(2)})
-              </Text>
-            )}
-          </View>
-        )}
 
-        {/* Notes/Description Rendering */}
-        {item.description ? (
-          <Text style={[
-            styles.eventDescription, 
-            isRTL ? styles.eventDescriptionRTL : null,
-            textAlignStyle
-          ]}>
-            {item.description}
-          </Text>
-        ) : null}
+            {typeof item.cost === 'number' && (
+              <View style={[rowDirectionStyle, { alignItems: 'center', marginVertical: 4 }]}>
+                <Text style={[styles.eventCostText, textAlignStyle]}>
+                  💰 {item.cost.toFixed(2)} {tripBaseCurrency}
+                </Text>
+                {typeof tripExchangeRate === 'number' && (
+                  <Text style={styles.eventCostConvertedText}>
+                    {'  '}(₪{(item.cost * tripExchangeRate).toFixed(2)})
+                  </Text>
+                )}
+              </View>
+            )}
+
+            {item.description ? (
+              <Text style={[
+                styles.eventDescription, 
+                isRTL ? styles.eventDescriptionRTL : null,
+                textAlignStyle
+              ]}>
+                {item.description}
+              </Text>
+            ) : null}
+          </>
+        )}
 
         {/* Action buttons under event */}
         <View style={[styles.eventActionsRow, rowDirectionStyle]}>
@@ -1161,48 +1308,190 @@ export default function TripDashboardScreen() {
                 />
               </View>
 
-              {/* Latitude & Longitude */}
-              <View style={[styles.modalFormRow, rowDirectionStyle]}>
-                <View style={[styles.modalFormCol]}>
-                  <Text style={[styles.modalFormLabel, textAlignStyle]}>
-                    {isRTL ? 'קו רוחב' : 'Latitude'}
+              {eventType === 'flight' ? (
+                <View style={{ marginTop: 8, borderTopWidth: 1, borderTopColor: '#dee2e6', paddingTop: 12 }}>
+                  <Text style={[styles.modalFormLabel, textAlignStyle, { fontWeight: 'bold', fontSize: 14, marginBottom: 8, color: colors.primary }]}>
+                    {isRTL ? 'פרטי טיסה' : 'Flight Details'}
                   </Text>
-                  <TextInput
-                    style={[styles.modalFormInput, textAlignStyle]}
-                    placeholder="e.g. 48.8566"
-                    value={eventLatitude}
-                    onChangeText={setEventLatitude}
-                    keyboardType="numeric"
-                  />
-                </View>
-                <View style={[styles.modalFormCol]}>
-                  <Text style={[styles.modalFormLabel, textAlignStyle]}>
-                    {isRTL ? 'קו אורך' : 'Longitude'}
-                  </Text>
-                  <TextInput
-                    style={[styles.modalFormInput, textAlignStyle]}
-                    placeholder="e.g. 2.3522"
-                    value={eventLongitude}
-                    onChangeText={setEventLongitude}
-                    keyboardType="numeric"
-                  />
-                </View>
-              </View>
 
-              {/* Interactive Map Picker */}
-              <View style={{ marginBottom: 12 }}>
-                <Text style={[styles.modalFormLabel, textAlignStyle]}>
-                  {isRTL ? 'סמן מיקום על המפה' : 'Pin location on map'}
-                </Text>
-                <MapPicker
-                  latitude={eventLatitude ? parseFloat(eventLatitude) : undefined}
-                  longitude={eventLongitude ? parseFloat(eventLongitude) : undefined}
-                  onSelectLocation={handleEventLocationSelected}
-                  lang={isRTL ? 'he' : 'en'}
-                  isRTL={isRTL}
-                  t={t}
-                />
-              </View>
+                  <View style={[styles.modalFormRow, rowDirectionStyle]}>
+                    <View style={[styles.modalFormCol]}>
+                      <Text style={[styles.modalFormLabel, textAlignStyle]}>
+                        {isRTL ? 'חברת תעופה' : 'Airline'}
+                      </Text>
+                      <TextInput
+                        style={[styles.modalFormInput, textAlignStyle]}
+                        placeholder="e.g. El Al"
+                        value={eventAirline}
+                        onChangeText={setEventAirline}
+                      />
+                    </View>
+                    <View style={[styles.modalFormCol]}>
+                      <Text style={[styles.modalFormLabel, textAlignStyle]}>
+                        {isRTL ? 'מספר טיסה' : 'Flight Number'}
+                      </Text>
+                      <TextInput
+                        style={[styles.modalFormInput, textAlignStyle]}
+                        placeholder="e.g. LY315"
+                        value={eventFlightNumber}
+                        onChangeText={setEventFlightNumber}
+                        autoCapitalize="characters"
+                      />
+                    </View>
+                  </View>
+
+                  <View style={[styles.modalFormRow, rowDirectionStyle]}>
+                    <View style={[styles.modalFormCol]}>
+                      <Text style={[styles.modalFormLabel, textAlignStyle]}>
+                        {isRTL ? 'קוד שדה תעופה מוצא' : 'Origin Airport Code'}
+                      </Text>
+                      <TextInput
+                        style={[styles.modalFormInput, textAlignStyle]}
+                        placeholder="e.g. TLV"
+                        value={eventOriginAirport}
+                        onChangeText={setEventOriginAirport}
+                        autoCapitalize="characters"
+                      />
+                    </View>
+                    <View style={[styles.modalFormCol]}>
+                      <Text style={[styles.modalFormLabel, textAlignStyle]}>
+                        {isRTL ? 'קוד שדה תעופה יעד' : 'Destination Airport Code'}
+                      </Text>
+                      <TextInput
+                        style={[styles.modalFormInput, textAlignStyle]}
+                        placeholder="e.g. LHR"
+                        value={eventDestinationAirport}
+                        onChangeText={setEventDestinationAirport}
+                        autoCapitalize="characters"
+                      />
+                    </View>
+                  </View>
+
+                  <View style={[styles.modalFormRow, rowDirectionStyle]}>
+                    <View style={[styles.modalFormCol]}>
+                      <Text style={[styles.modalFormLabel, textAlignStyle]}>
+                        {isRTL ? 'שעת המראה' : 'Departure Time'}
+                      </Text>
+                      <TextInput
+                        style={[styles.modalFormInput, textAlignStyle]}
+                        placeholder="e.g. 10:30 AM"
+                        value={eventDepartureTime}
+                        onChangeText={setEventDepartureTime}
+                      />
+                    </View>
+                    <View style={[styles.modalFormCol]}>
+                      <Text style={[styles.modalFormLabel, textAlignStyle]}>
+                        {isRTL ? 'שעת נחיתה' : 'Arrival Time'}
+                      </Text>
+                      <TextInput
+                        style={[styles.modalFormInput, textAlignStyle]}
+                        placeholder="e.g. 02:00 PM"
+                        value={eventArrivalTime}
+                        onChangeText={setEventArrivalTime}
+                      />
+                    </View>
+                  </View>
+
+                  <View style={[styles.modalFormRow, rowDirectionStyle]}>
+                    <View style={[styles.modalFormCol]}>
+                      <Text style={[styles.modalFormLabel, textAlignStyle]}>
+                        {isRTL ? 'קו רוחב מוצא' : 'Origin Latitude'}
+                      </Text>
+                      <TextInput
+                        style={[styles.modalFormInput, textAlignStyle]}
+                        placeholder="e.g. 32.0094"
+                        value={eventOriginLatitude}
+                        onChangeText={setEventOriginLatitude}
+                        keyboardType="numeric"
+                      />
+                    </View>
+                    <View style={[styles.modalFormCol]}>
+                      <Text style={[styles.modalFormLabel, textAlignStyle]}>
+                        {isRTL ? 'קו אורך מוצא' : 'Origin Longitude'}
+                      </Text>
+                      <TextInput
+                        style={[styles.modalFormInput, textAlignStyle]}
+                        placeholder="e.g. 34.8769"
+                        value={eventOriginLongitude}
+                        onChangeText={setEventOriginLongitude}
+                        keyboardType="numeric"
+                      />
+                    </View>
+                  </View>
+
+                  <View style={[styles.modalFormRow, rowDirectionStyle]}>
+                    <View style={[styles.modalFormCol]}>
+                      <Text style={[styles.modalFormLabel, textAlignStyle]}>
+                        {isRTL ? 'קו רוחב יעד' : 'Destination Latitude'}
+                      </Text>
+                      <TextInput
+                        style={[styles.modalFormInput, textAlignStyle]}
+                        placeholder="e.g. 51.4700"
+                        value={eventLatitude}
+                        onChangeText={setEventLatitude}
+                        keyboardType="numeric"
+                      />
+                    </View>
+                    <View style={[styles.modalFormCol]}>
+                      <Text style={[styles.modalFormLabel, textAlignStyle]}>
+                        {isRTL ? 'קו אורך יעד' : 'Destination Longitude'}
+                      </Text>
+                      <TextInput
+                        style={[styles.modalFormInput, textAlignStyle]}
+                        placeholder="e.g. -0.4543"
+                        value={eventLongitude}
+                        onChangeText={setEventLongitude}
+                        keyboardType="numeric"
+                      />
+                    </View>
+                  </View>
+                </View>
+              ) : (
+                <>
+                  {/* Latitude & Longitude */}
+                  <View style={[styles.modalFormRow, rowDirectionStyle]}>
+                    <View style={[styles.modalFormCol]}>
+                      <Text style={[styles.modalFormLabel, textAlignStyle]}>
+                        {isRTL ? 'קו רוחב' : 'Latitude'}
+                      </Text>
+                      <TextInput
+                        style={[styles.modalFormInput, textAlignStyle]}
+                        placeholder="e.g. 48.8566"
+                        value={eventLatitude}
+                        onChangeText={setEventLatitude}
+                        keyboardType="numeric"
+                      />
+                    </View>
+                    <View style={[styles.modalFormCol]}>
+                      <Text style={[styles.modalFormLabel, textAlignStyle]}>
+                        {isRTL ? 'קו אורך' : 'Longitude'}
+                      </Text>
+                      <TextInput
+                        style={[styles.modalFormInput, textAlignStyle]}
+                        placeholder="e.g. 2.3522"
+                        value={eventLongitude}
+                        onChangeText={setEventLongitude}
+                        keyboardType="numeric"
+                      />
+                    </View>
+                  </View>
+
+                  {/* Interactive Map Picker */}
+                  <View style={{ marginBottom: 12 }}>
+                    <Text style={[styles.modalFormLabel, textAlignStyle]}>
+                      {isRTL ? 'סמן מיקום על המפה' : 'Pin location on map'}
+                    </Text>
+                    <MapPicker
+                      latitude={eventLatitude ? parseFloat(eventLatitude) : undefined}
+                      longitude={eventLongitude ? parseFloat(eventLongitude) : undefined}
+                      onSelectLocation={handleEventLocationSelected}
+                      lang={isRTL ? 'he' : 'en'}
+                      isRTL={isRTL}
+                      t={t}
+                    />
+                  </View>
+                </>
+              )}
 
               {/* Additional Notes / Description */}
               <View style={{ marginBottom: 12 }}>
@@ -2111,6 +2400,142 @@ const styles = StyleSheet.create({
     fontFamily: typography.fontFamily,
     fontSize: typography.sizes.xs,
     color: '#868e96',
+    fontWeight: typography.weights.medium,
+  },
+  webFlightRow: {
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 12,
+    width: '100%',
+  },
+  webFlightBadgeCol: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minWidth: 150,
+  },
+  webFlightEmoji: {
+    fontSize: 24,
+  },
+  webFlightAirline: {
+    fontFamily: typography.fontFamily,
+    fontSize: typography.sizes.md,
+    fontWeight: typography.weights.bold,
+    color: colors.text,
+  },
+  webFlightNumber: {
+    fontFamily: typography.fontFamily,
+    fontSize: typography.sizes.xs,
+    color: colors.textLight,
+  },
+  webFlightTimeline: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    justifyContent: 'center',
+    marginHorizontal: 16,
+  },
+  webFlightTimePoint: {
+    alignItems: 'center',
+    minWidth: 80,
+  },
+  webFlightTime: {
+    fontFamily: typography.fontFamily,
+    fontSize: typography.sizes.md,
+    fontWeight: typography.weights.bold,
+    color: colors.text,
+  },
+  webFlightAirport: {
+    fontFamily: typography.fontFamily,
+    fontSize: typography.sizes.xs,
+    color: colors.textLight,
+    fontWeight: typography.weights.bold,
+  },
+  webFlightConnector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: 12,
+    flex: 1,
+    maxWidth: 200,
+  },
+  webFlightDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.primary,
+  },
+  webFlightLine: {
+    flex: 1,
+    height: 2,
+    backgroundColor: '#dee2e6',
+  },
+  webFlightMidplane: {
+    fontSize: 16,
+    color: colors.primary,
+    marginHorizontal: 4,
+    transform: [{ rotate: '90deg' }],
+  },
+  webFlightInfoBox: {
+    minWidth: 100,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  webFlightInfoLabel: {
+    fontFamily: typography.fontFamily,
+    fontSize: 9,
+    color: colors.textLight,
+    textTransform: 'uppercase',
+  },
+  webFlightInfoValue: {
+    fontFamily: typography.fontFamily,
+    fontSize: typography.sizes.sm,
+    fontWeight: typography.weights.bold,
+    color: colors.text,
+  },
+  webFlightCostVal: {
+    fontFamily: typography.fontFamily,
+    fontSize: typography.sizes.sm,
+    fontWeight: typography.weights.bold,
+    color: '#2b8a3e',
+  },
+  webFlightCostConverted: {
+    fontFamily: typography.fontFamily,
+    fontSize: typography.sizes.xs,
+    color: '#868e96',
+  },
+  mobileFlightRow: {
+    width: '100%',
+    paddingVertical: 8,
+  },
+  mobileFlightHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  mobileFlightTimeLarge: {
+    fontFamily: typography.fontFamily,
+    fontSize: 24,
+    fontWeight: typography.weights.bold,
+    color: colors.text,
+  },
+  mobileFlightRouteRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    padding: 8,
+    marginTop: 4,
+  },
+  mobileFlightRouteText: {
+    fontFamily: typography.fontFamily,
+    fontSize: typography.sizes.md,
+    fontWeight: typography.weights.bold,
+    color: colors.text,
+  },
+  mobileFlightAirlineText: {
+    fontFamily: typography.fontFamily,
+    fontSize: typography.sizes.xs,
+    color: colors.textLight,
     fontWeight: typography.weights.medium,
   },
 });
