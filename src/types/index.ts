@@ -50,3 +50,11 @@ export interface Document {
   name: string;
   downloadUrl: string;
 }
+
+export interface PackingItem {
+  id: string;
+  tripId: string;
+  itemName: string;
+  category: string;
+  isPacked: boolean;
+}

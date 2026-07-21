@@ -1,6 +1,6 @@
-import { collection, addDoc, getDocs, query, where, doc, getDoc } from 'firebase/firestore';
+import { collection, addDoc, getDocs, query, where, doc, getDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../config/firebaseConfig';
-import { Group, Trip, Event, Expense, Document } from '../types';
+import { Group, Trip, Event, Expense, Document, PackingItem } from '../types';
 
 /**
  * Creates a new Group document in Firestore.
@@ -298,4 +298,65 @@ export const getDocumentsForTrip = async (tripId: string): Promise<Document[]> =
       downloadUrl: data.downloadUrl,
     } as Document;
   });
+};
+
+/**
+ * Creates a new PackingItem document in Firestore under 'packingItems'.
+ */
+export const createPackingItem = async (
+  tripId: string,
+  itemName: string,
+  category: string
+): Promise<PackingItem> => {
+  const packingItemsCollection = collection(db, 'packingItems');
+  const data = {
+    tripId,
+    itemName,
+    category,
+    isPacked: false,
+  };
+  const docRef = await addDoc(packingItemsCollection, data);
+  return {
+    id: docRef.id,
+    ...data,
+  };
+};
+
+/**
+ * Fetches all packing items associated with a specific tripId from Firestore.
+ */
+export const getPackingItemsForTrip = async (tripId: string): Promise<PackingItem[]> => {
+  const packingItemsCollection = collection(db, 'packingItems');
+  const q = query(packingItemsCollection, where('tripId', '==', tripId));
+  const querySnapshot = await getDocs(q);
+
+  return querySnapshot.docs.map((doc) => {
+    const data = doc.data();
+    return {
+      id: doc.id,
+      tripId: data.tripId,
+      itemName: data.itemName,
+      category: data.category,
+      isPacked: !!data.isPacked,
+    } as PackingItem;
+  });
+};
+
+/**
+ * Updates the packed status flag of a specific packing item in Firestore.
+ */
+export const updatePackingItemPacked = async (
+  itemId: string,
+  isPacked: boolean
+): Promise<void> => {
+  const itemDocRef = doc(db, 'packingItems', itemId);
+  await updateDoc(itemDocRef, { isPacked });
+};
+
+/**
+ * Deletes a specific packing item from Firestore.
+ */
+export const deletePackingItem = async (itemId: string): Promise<void> => {
+  const itemDocRef = doc(db, 'packingItems', itemId);
+  await deleteDoc(itemDocRef);
 };

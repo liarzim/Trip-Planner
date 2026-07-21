@@ -30,6 +30,7 @@ import { httpsCallable } from 'firebase/functions';
 import { useTranslation } from '../services/translationService';
 import LanguageSelector from '../components/LanguageSelector';
 import DashboardMap from '../components/DashboardMap';
+import PackingList from '../components/PackingList';
 
 type TripDashboardRouteProp = RouteProp<RootStackParamList, 'TripDashboard'>;
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'TripDashboard'>;
@@ -444,33 +445,8 @@ export default function TripDashboardScreen() {
 
     return (
       <View style={styles.footerSection}>
-        {/* Daily Checklist Section */}
-        <View style={styles.checklistCard}>
-          <Text style={[styles.checklistTitle, textAlignStyle]}>{t('dashboard.daily_checklist')}</Text>
-          {checklist.map((item) => (
-            <TouchableOpacity 
-              key={item.id} 
-              style={[styles.checklistItemRow, rowDirectionStyle]}
-              onPress={() => toggleChecklistItem(item.id)}
-              activeOpacity={0.7}
-            >
-              <View style={[
-                styles.checkbox, 
-                item.completed && styles.checkboxCompleted,
-                { marginRight: isRTL ? 0 : 12, marginLeft: isRTL ? 12 : 0 }
-              ]}>
-                {item.completed && <Text style={styles.checkboxTick}>✓</Text>}
-              </View>
-              <Text style={[
-                styles.checklistText, 
-                item.completed && styles.checklistTextCompleted,
-                { flex: 1, textAlign: isRTL ? 'right' : 'left' }
-              ]}>
-                {item.text}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+        {/* Dynamic Packing List Section */}
+        <PackingList tripId={tripId} />
 
         {/* Import Itinerary DOCX Card */}
         <View style={styles.importCard}>
