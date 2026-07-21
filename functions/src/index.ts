@@ -13,7 +13,11 @@ const geminiApiKey = defineSecret("GEMINI_API_KEY");
 // Import mammoth
 const mammoth = require("mammoth");
 
-export const parseTripDocument = onCall({ secrets: [geminiApiKey] }, async (request) => {
+export const parseTripDocument = onCall({ 
+  secrets: [geminiApiKey],
+  memory: "1GiB",
+  timeoutSeconds: 120
+}, async (request) => {
   // Ensure the user is authenticated
   if (!request.auth) {
     throw new HttpsError("unauthenticated", "The function must be called while authenticated.");
