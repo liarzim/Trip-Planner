@@ -66,10 +66,11 @@ function getBearing(start: Coordinate, end: Coordinate): number {
 
 interface DashboardMapProps {
   events: Event[];
+  focusedEventId?: string | null;
   onClose?: () => void;
 }
 
-export default function DashboardMap({ events }: DashboardMapProps) {
+export default function DashboardMap({ events, focusedEventId }: DashboardMapProps) {
   const mapRef = useRef<MapView>(null);
   const apiKey = appJson.expo.android.config.googleMaps.apiKey;
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
@@ -78,6 +79,22 @@ export default function DashboardMap({ events }: DashboardMapProps) {
   const geoEvents = events.filter(
     (e) => typeof e.latitude === 'number' && typeof e.longitude === 'number'
   );
+
+  useEffect(() => {
+    if (focusedEventId && mapRef.current) {
+      const match = geoEvents.find((e) => e.id === focusedEventId);
+      if (match) {
+        setTimeout(() => {
+          mapRef.current?.animateToRegion({
+            latitude: match.latitude!,
+            longitude: match.longitude!,
+            latitudeDelta: 0.01,
+            longitudeDelta: 0.01,
+          }, 1000);
+        }, 100);
+      }
+    }
+  }, [focusedEventId]);
 
   useEffect(() => {
     if (geoEvents.length > 0 && mapRef.current) {
@@ -142,10 +159,12 @@ export default function DashboardMap({ events }: DashboardMapProps) {
         {geoEvents.map((item, index) => {
           let emoji = '📍';
           const type = item.type.toLowerCase();
+          const isHotel = type === 'hotel';
+          
           if (type.includes('flight') || type.includes('airport')) {
             emoji = selectedEventId === item.id ? '🛬' : '✈️';
-          } else if (type.includes('hotel') || type.includes('accommodation') || type.includes('stay')) {
-            emoji = '🛏️';
+          } else if (isHotel || type.includes('accommodation') || type.includes('stay')) {
+            emoji = '🏨';
           } else if (type.includes('trail') || type.includes('hike') || type.includes('hiking') || type.includes('sightseeing')) {
             emoji = '🥾';
           } else if (type.includes('poi') || type.includes('museum') || type.includes('sight')) {
@@ -165,7 +184,8 @@ export default function DashboardMap({ events }: DashboardMapProps) {
             >
               <View style={[
                 styles.markerContainer,
-                selectedEventId === item.id && { borderColor: '#e222b6', borderWidth: 2 }
+                isHotel && { backgroundColor: '#ebfbee', borderColor: '#2b8a3e', borderWidth: 2 },
+                selectedEventId === item.id && { borderColor: '#e222b6', borderWidth: 3 }
               ]}>
                 <Text style={styles.markerText}>{emoji}</Text>
               </View>

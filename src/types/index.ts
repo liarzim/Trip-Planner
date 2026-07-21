@@ -43,6 +43,7 @@ export interface Event {
   longitude?: number;
   originLatitude?: number;
   originLongitude?: number;
+  address?: string;
   bookingReference?: string;
   description?: string;
   flightNumber?: string;

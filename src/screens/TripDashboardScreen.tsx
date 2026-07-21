@@ -22,6 +22,7 @@ import * as FileSystem from 'expo-file-system/legacy';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { getEventsForTrip, getExpensesForTrip, getDocumentsForTrip, saveDocument, getTrip, createEvent } from '../services/dbService';
 import { uploadTripDocument } from '../services/storageService';
+import { geocodeAddress } from '../services/geocodingService';
 import { getCachedOrDownloadFile, isFileCached } from '../services/fileCacheService';
 import { Event, Expense, Document, Trip } from '../types';
 import { useNetworkState } from '../hooks/useNetworkState';
@@ -106,6 +107,35 @@ export default function TripDashboardScreen() {
   const [eventDestinationAirport, setEventDestinationAirport] = useState('');
   const [eventOriginLatitude, setEventOriginLatitude] = useState('');
   const [eventOriginLongitude, setEventOriginLongitude] = useState('');
+
+  // Hotel Specific Form States
+  const [eventAddress, setEventAddress] = useState('');
+  const [eventHotelUrl, setEventHotelUrl] = useState('');
+  const [eventCheckInTime, setEventCheckInTime] = useState('');
+  const [eventCheckOutTime, setEventCheckOutTime] = useState('');
+
+  // Expandable Hotel Accordion State
+  const [expandedHotelIds, setExpandedHotelIds] = useState<Record<string, boolean>>({});
+  const [focusedEventId, setFocusedEventId] = useState<string | null>(null);
+
+  const toggleHotelAccordion = (id: string) => {
+    setExpandedHotelIds((prev) => ({
+      ...prev,
+      [id]: !prev[id],
+    }));
+  };
+
+  const handleQuickNavigate = (lat?: number, lon?: number, eventId?: string) => {
+    if (typeof lat === 'number' && typeof lon === 'number') {
+      setFocusedEventId(null);
+      setTimeout(() => {
+        setFocusedEventId(eventId || null);
+      }, 50);
+      if (!isWeb) {
+        setShowMapOnMobile(true);
+      }
+    }
+  };
 
   // Daily Checklist State
   const [checklist, setChecklist] = useState<ChecklistItem[]>([
@@ -337,6 +367,10 @@ export default function TripDashboardScreen() {
     setEventDestinationAirport('');
     setEventOriginLatitude('');
     setEventOriginLongitude('');
+    setEventAddress('');
+    setEventHotelUrl('');
+    setEventCheckInTime('');
+    setEventCheckOutTime('');
     setEventFormError('');
     setIsAddEventModalVisible(true);
   };
@@ -406,6 +440,21 @@ export default function TripDashboardScreen() {
     setEventSaving(true);
 
     try {
+      let finalLat = latVal;
+      let finalLon = lonVal;
+
+      if (eventType.toLowerCase() === 'hotel' && eventAddress.trim() && latVal === undefined && lonVal === undefined) {
+        try {
+          const coords = await geocodeAddress(eventAddress.trim());
+          if (coords) {
+            finalLat = coords.latitude;
+            finalLon = coords.longitude;
+          }
+        } catch (geocodeErr) {
+          console.error('Error auto-geocoding address:', geocodeErr);
+        }
+      }
+
       let endEventDate = eventDate;
       const startMin = parseTimeToMinutes(eventStartTime);
       const endMin = parseTimeToMinutes(eventEndTime);
@@ -422,8 +471,8 @@ export default function TripDashboardScreen() {
         eventType.toLowerCase() as 'flight' | 'hotel' | 'waypoint',
         combinedStart,
         combinedEnd,
-        latVal,
-        lonVal,
+        finalLat,
+        finalLon,
         eventBookingReference?.trim() || undefined,
         eventDescription?.trim() || undefined,
         eventFlightNumber.trim() || undefined,
@@ -432,10 +481,19 @@ export default function TripDashboardScreen() {
         eventArrivalTime.trim() || undefined,
         eventOriginAirport.trim().toUpperCase() || undefined,
         eventDestinationAirport.trim().toUpperCase() || undefined,
-        undefined, undefined, undefined, undefined, undefined,
-        undefined, undefined, undefined, undefined, costVal,
+        eventHotelUrl.trim() || undefined,
+        eventCheckInTime.trim() || undefined,
+        eventCheckOutTime.trim() || undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        undefined,
+        costVal,
         originLatVal,
-        originLonVal
+        originLonVal,
+        eventAddress.trim() || undefined
       );
 
       // Refresh list
@@ -649,6 +707,7 @@ export default function TripDashboardScreen() {
     const alignSelfStyle = { alignSelf: (isRTL ? 'flex-end' : 'flex-start') as 'flex-start' | 'flex-end' };
     const weather = getWeatherForEvent(item);
     const isFlight = item.type === 'flight';
+    const isHotel = item.type === 'hotel';
 
     return (
       <View style={[styles.eventCard, { alignItems: isRTL ? 'flex-end' : 'flex-start' }]}>
@@ -736,6 +795,91 @@ export default function TripDashboardScreen() {
                     </Text>
                   )}
                 </View>
+              )}
+            </View>
+          )
+        ) : isHotel ? (
+          isWeb ? (
+            <View style={styles.webHotelContainer}>
+              <TouchableOpacity
+                style={[styles.webHotelHeader, rowDirectionStyle]}
+                onPress={() => toggleHotelAccordion(item.id)}
+                activeOpacity={0.7}
+              >
+                <View style={[rowDirectionStyle, { alignItems: 'center' }]}>
+                  <Text style={styles.webHotelEmoji}>🏨</Text>
+                  <Text style={[styles.webHotelTitle, textAlignStyle]}>{item.title}</Text>
+                  <View style={[styles.badge, { backgroundColor: '#ebfbee', alignSelf: 'center', marginRight: isRTL ? 0 : 6, marginLeft: isRTL ? 6 : 0 }]}>
+                    <Text style={[styles.badgeText, { color: '#2b8a3e' }]}>HOTEL</Text>
+                  </View>
+                </View>
+                <Text style={styles.accordionToggleIcon}>
+                  {expandedHotelIds[item.id] ? '▲' : '▼'}
+                </Text>
+              </TouchableOpacity>
+
+              {expandedHotelIds[item.id] && (
+                <View style={styles.webHotelAccordionContent}>
+                  {item.bookingReference ? (
+                    <Text style={[styles.webHotelDetailText, textAlignStyle]}>
+                      🏷️  {isRTL ? 'סימוכין הזמנה' : 'Booking Ref'}: <Text style={{ fontWeight: 'bold' }}>{item.bookingReference}</Text>
+                    </Text>
+                  ) : null}
+                  <Text style={[styles.webHotelDetailText, textAlignStyle]}>
+                    ⏰  {isRTL ? 'צ\'ק-אין' : 'Check-In'}: {item.checkInTime || '15:00'}  •  {isRTL ? 'צ\'ק-אאוט' : 'Check-Out'}: {item.checkOutTime || '11:00'}
+                  </Text>
+                  {item.hotelUrl ? (
+                    <TouchableOpacity onPress={() => Linking.openURL(item.hotelUrl!)}>
+                      <Text style={[styles.webHotelLink, textAlignStyle]}>
+                        🌐  {isRTL ? 'בקר באתר המלון' : 'Visit Hotel Website'}
+                      </Text>
+                    </TouchableOpacity>
+                  ) : null}
+                  {typeof item.cost === 'number' && (
+                    <View style={[rowDirectionStyle, { alignItems: 'center', marginTop: 4 }]}>
+                      <Text style={styles.eventCostText}>
+                        💰 {item.cost.toFixed(2)} {tripBaseCurrency}
+                      </Text>
+                      {typeof tripExchangeRate === 'number' && (
+                        <Text style={styles.eventCostConvertedText}>
+                          {'  '}(₪{(item.cost * tripExchangeRate).toFixed(2)})
+                        </Text>
+                      )}
+                    </View>
+                  )}
+                </View>
+              )}
+            </View>
+          ) : (
+            <View style={styles.mobileHotelContainer}>
+              <View style={[styles.mobileHotelHeaderRow, rowDirectionStyle]}>
+                <View style={[rowDirectionStyle, { alignItems: 'center', flex: 1 }]}>
+                  <Text style={styles.mobileHotelEmoji}>🏨</Text>
+                  <Text style={[styles.mobileHotelTitle, textAlignStyle]} numberOfLines={1}>{item.title}</Text>
+                </View>
+                {weather && (
+                  <View style={[styles.mobileWeatherWidget, { marginLeft: isRTL ? 8 : 'auto', marginRight: isRTL ? 'auto' : 8 }]}>
+                    <Text style={styles.mobileWeatherText}>
+                      {getWeatherEmoji(weather.status)} {weather.temp}°C
+                    </Text>
+                  </View>
+                )}
+              </View>
+              
+              <Text style={[styles.mobileHotelCheckInText, textAlignStyle]}>
+                🔑 {isRTL ? `צ'ק-אין: ${item.startTime}` : `Check-in: ${item.startTime}`}
+              </Text>
+
+              {hasCoordinates && (
+                <TouchableOpacity
+                  style={[styles.mobileHotelNavBtn, rowDirectionStyle]}
+                  onPress={() => handleQuickNavigate(item.latitude, item.longitude, item.id)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.mobileHotelNavBtnText}>
+                    🗺️ {isRTL ? 'נווט למלון במפה' : 'Show Hotel on Map'}
+                  </Text>
+                </TouchableOpacity>
               )}
             </View>
           )
@@ -1034,7 +1178,7 @@ export default function TripDashboardScreen() {
           </View>
         </View>
         <View style={{ flex: 1 }}>
-          <DashboardMap events={events} />
+          <DashboardMap events={events} focusedEventId={focusedEventId} />
         </View>
         <TouchableOpacity 
           style={styles.mobileMapFab}
@@ -1098,7 +1242,7 @@ export default function TripDashboardScreen() {
             </View>
           </View>
           <View style={styles.webMapColumn}>
-            <DashboardMap events={events} />
+            <DashboardMap events={events} focusedEventId={focusedEventId} />
           </View>
         </View>
       ) : (
@@ -1439,6 +1583,90 @@ export default function TripDashboardScreen() {
                       <TextInput
                         style={[styles.modalFormInput, textAlignStyle]}
                         placeholder="e.g. -0.4543"
+                        value={eventLongitude}
+                        onChangeText={setEventLongitude}
+                        keyboardType="numeric"
+                      />
+                    </View>
+                  </View>
+                </View>
+              ) : eventType === 'hotel' ? (
+                <View style={{ marginTop: 8, borderTopWidth: 1, borderTopColor: '#dee2e6', paddingTop: 12 }}>
+                  <Text style={[styles.modalFormLabel, textAlignStyle, { fontWeight: 'bold', fontSize: 14, marginBottom: 8, color: '#2b8a3e' }]}>
+                    {isRTL ? 'פרטי מלון' : 'Hotel Details'}
+                  </Text>
+
+                  <View style={{ marginBottom: 12 }}>
+                    <Text style={[styles.modalFormLabel, textAlignStyle]}>
+                      {isRTL ? 'כתובת המלון (לשם פענוח מיקום במפה)' : 'Hotel Address (for Map Geocoding)'}
+                    </Text>
+                    <TextInput
+                      style={[styles.modalFormInput, textAlignStyle]}
+                      placeholder={isRTL ? 'למשל: רחוב הירקון 99, תל אביב' : 'e.g. 99 Hayarkon St, Tel Aviv'}
+                      value={eventAddress}
+                      onChangeText={setEventAddress}
+                    />
+                  </View>
+
+                  <View style={{ marginBottom: 12 }}>
+                    <Text style={[styles.modalFormLabel, textAlignStyle]}>
+                      {isRTL ? 'קישור לאתר המלון' : 'Hotel Website URL'}
+                    </Text>
+                    <TextInput
+                      style={[styles.modalFormInput, textAlignStyle]}
+                      placeholder="e.g. https://www.hilton.com"
+                      value={eventHotelUrl}
+                      onChangeText={setEventHotelUrl}
+                      keyboardType="url"
+                      autoCapitalize="none"
+                    />
+                  </View>
+
+                  <View style={[styles.modalFormRow, rowDirectionStyle]}>
+                    <View style={[styles.modalFormCol]}>
+                      <Text style={[styles.modalFormLabel, textAlignStyle]}>
+                        {isRTL ? 'שעת צ\'ק-אין' : 'Check-In Time'}
+                      </Text>
+                      <TextInput
+                        style={[styles.modalFormInput, textAlignStyle]}
+                        placeholder="e.g. 15:00"
+                        value={eventCheckInTime}
+                        onChangeText={setEventCheckInTime}
+                      />
+                    </View>
+                    <View style={[styles.modalFormCol]}>
+                      <Text style={[styles.modalFormLabel, textAlignStyle]}>
+                        {isRTL ? 'שעת צ\'ק-אאוט' : 'Check-Out Time'}
+                      </Text>
+                      <TextInput
+                        style={[styles.modalFormInput, textAlignStyle]}
+                        placeholder="e.g. 11:00"
+                        value={eventCheckOutTime}
+                        onChangeText={setEventCheckOutTime}
+                      />
+                    </View>
+                  </View>
+
+                  <View style={[styles.modalFormRow, rowDirectionStyle]}>
+                    <View style={[styles.modalFormCol]}>
+                      <Text style={[styles.modalFormLabel, textAlignStyle]}>
+                        {isRTL ? 'קו רוחב (אופציונלי)' : 'Latitude (Optional)'}
+                      </Text>
+                      <TextInput
+                        style={[styles.modalFormInput, textAlignStyle]}
+                        placeholder="e.g. 32.0792"
+                        value={eventLatitude}
+                        onChangeText={setEventLatitude}
+                        keyboardType="numeric"
+                      />
+                    </View>
+                    <View style={[styles.modalFormCol]}>
+                      <Text style={[styles.modalFormLabel, textAlignStyle]}>
+                        {isRTL ? 'קו אורך (אופציונלי)' : 'Longitude (Optional)'}
+                      </Text>
+                      <TextInput
+                        style={[styles.modalFormInput, textAlignStyle]}
+                        placeholder="e.g. 34.7672"
                         value={eventLongitude}
                         onChangeText={setEventLongitude}
                         keyboardType="numeric"
@@ -2537,5 +2765,94 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.xs,
     color: colors.textLight,
     fontWeight: typography.weights.medium,
+  },
+  webHotelContainer: {
+    width: '100%',
+    paddingVertical: 6,
+  },
+  webHotelHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+    paddingVertical: 8,
+  },
+  webHotelEmoji: {
+    fontSize: 24,
+    marginRight: 8,
+  },
+  webHotelTitle: {
+    fontFamily: typography.fontFamily,
+    fontSize: typography.sizes.md,
+    fontWeight: typography.weights.bold,
+    color: colors.text,
+  },
+  accordionToggleIcon: {
+    fontSize: 16,
+    color: colors.textLight,
+    paddingHorizontal: 8,
+  },
+  webHotelAccordionContent: {
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    padding: 12,
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: '#dee2e6',
+  },
+  webHotelDetailText: {
+    fontFamily: typography.fontFamily,
+    fontSize: typography.sizes.sm,
+    color: colors.text,
+    marginBottom: 6,
+  },
+  webHotelLink: {
+    fontFamily: typography.fontFamily,
+    fontSize: typography.sizes.sm,
+    color: colors.primary,
+    fontWeight: typography.weights.bold,
+    marginTop: 4,
+    textDecorationLine: 'underline',
+  },
+  mobileHotelContainer: {
+    width: '100%',
+    paddingVertical: 6,
+  },
+  mobileHotelHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  mobileHotelEmoji: {
+    fontSize: 22,
+    marginRight: 6,
+  },
+  mobileHotelTitle: {
+    fontFamily: typography.fontFamily,
+    fontSize: typography.sizes.md,
+    fontWeight: typography.weights.bold,
+    color: colors.text,
+  },
+  mobileHotelCheckInText: {
+    fontFamily: typography.fontFamily,
+    fontSize: typography.sizes.sm,
+    color: colors.textLight,
+    marginBottom: 10,
+  },
+  mobileHotelNavBtn: {
+    backgroundColor: '#e7f5ff',
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#a5d8ff',
+  },
+  mobileHotelNavBtnText: {
+    fontFamily: typography.fontFamily,
+    fontSize: typography.sizes.sm,
+    fontWeight: typography.weights.bold,
+    color: colors.primary,
   },
 });
