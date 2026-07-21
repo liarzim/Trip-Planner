@@ -117,6 +117,14 @@ Return ONLY a raw JSON array. Do not include markdown code block syntax (like \`
     if (!response.ok) {
       const errText = await response.text();
       logger.error("Gemini API call failed", errText);
+      try {
+        const errJson = JSON.parse(errText);
+        if (errJson.error?.message) {
+          throw new Error(`Gemini API error: ${errJson.error.message}`);
+        }
+      } catch (e) {
+        // ignore and fallback
+      }
       throw new Error(`Gemini API error: ${response.statusText} (${errText})`);
     }
 

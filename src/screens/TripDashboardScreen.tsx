@@ -277,7 +277,16 @@ export default function TripDashboardScreen() {
           }
         } catch (innerError: any) {
           console.error('Failed to parse during file read:', innerError);
-          alert(`Parsing error: ${innerError.message || innerError}`);
+          const errorMsg = innerError.message || String(innerError);
+          let friendlyMsg = t('error.generic_parsing');
+          if (errorMsg.includes('high demand') || errorMsg.includes('UNAVAILABLE') || errorMsg.includes('busy') || errorMsg.includes('503')) {
+            friendlyMsg = t('error.gemini_busy');
+          } else if (errorMsg.includes('prepayment') || errorMsg.includes('depleted') || errorMsg.includes('exhausted') || errorMsg.includes('429')) {
+            friendlyMsg = t('error.quota_exceeded');
+          } else {
+            friendlyMsg = `${t('error.generic_parsing')} (${errorMsg})`;
+          }
+          alert(friendlyMsg);
         } finally {
           setParsing(false);
         }
@@ -328,7 +337,16 @@ export default function TripDashboardScreen() {
       }
     } catch (error: any) {
       console.error('Failed to parse itinerary document:', error);
-      alert(`Error parsing document: ${error.message || error}`);
+      const errorMsg = error.message || String(error);
+      let friendlyMsg = t('error.generic_parsing');
+      if (errorMsg.includes('high demand') || errorMsg.includes('UNAVAILABLE') || errorMsg.includes('busy') || errorMsg.includes('503')) {
+        friendlyMsg = t('error.gemini_busy');
+      } else if (errorMsg.includes('prepayment') || errorMsg.includes('depleted') || errorMsg.includes('exhausted') || errorMsg.includes('429')) {
+        friendlyMsg = t('error.quota_exceeded');
+      } else {
+        friendlyMsg = `${t('error.generic_parsing')} (${errorMsg})`;
+      }
+      alert(friendlyMsg);
     } finally {
       setParsing(false);
     }

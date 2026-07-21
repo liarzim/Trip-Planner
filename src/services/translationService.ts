@@ -132,6 +132,9 @@ const translations: Record<Language, Record<string, string>> = {
     'preview.subtitle': 'Confirm the events extracted by Gemini before saving',
     'preview.confirm_btn': 'Confirm & Save All Events',
     'preview.cancel_btn': 'Cancel',
+    'error.gemini_busy': 'The AI service is currently busy due to very high demand. Spikes are temporary—please try again in a few moments.',
+    'error.quota_exceeded': 'The AI service prepayment credits are temporarily depleted or quota limit was exceeded. Please try again later.',
+    'error.generic_parsing': 'An error occurred while parsing the travel document. Please check the file and try again.',
   },
   he: {
     // Auth / Login
@@ -225,6 +228,9 @@ const translations: Record<Language, Record<string, string>> = {
     'preview.subtitle': 'אשר את האירועים שחולצו על ידי Gemini לפני שמירה',
     'preview.confirm_btn': 'אשר ושמור את כל האירועים',
     'preview.cancel_btn': 'ביטול',
+    'error.gemini_busy': 'שירות הבינה המלאכותית עמוס כעת עקב עומס זמני. אנא נסה להעלות את המסמך שוב בעוד מספר רגעים.',
+    'error.quota_exceeded': 'מכסת שימושי הבינה המלאכותית הסתיימה או שאין מספיק יתרת תשלום בפרויקט. אנא נסה שוב מאוחר יותר.',
+    'error.generic_parsing': 'אירעה שגיאה בעת ניתוח מסמך הנסיעה. אנא בדוק את הקובץ ונסה שוב.',
   }
 };
 
