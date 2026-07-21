@@ -23,11 +23,12 @@ import { RootStackParamList } from '../navigation/AppNavigator';
 import { getEventsForTrip, getExpensesForTrip, getDocumentsForTrip, saveDocument, getTrip, createEvent } from '../services/dbService';
 import { uploadTripDocument } from '../services/storageService';
 import { getCachedOrDownloadFile, isFileCached } from '../services/fileCacheService';
-import { Event, Expense, Document } from '../types';
+import { Event, Expense, Document, Trip } from '../types';
 import { useNetworkState } from '../hooks/useNetworkState';
 import { colors } from '../theme/colors';
 import { typography } from '../theme/typography';
 import MapPicker from '../components/MapPicker';
+import { fetchWeatherForecast } from '../services/weatherService';
 import { functions } from '../config/firebaseConfig';
 import { httpsCallable } from 'firebase/functions';
 import { useTranslation } from '../services/translationService';
@@ -98,6 +99,10 @@ export default function TripDashboardScreen() {
     { id: '3', text: 'Check local weather forecast', completed: false },
     { id: '4', text: 'Charge external powerbanks & phones', completed: false },
   ]);
+
+  // Weather States
+  const [weatherForecast, setWeatherForecast] = useState<any>(null);
+  const [loadingWeather, setLoadingWeather] = useState(false);
 
   // Fetch events, expenses, and documents in parallel on screen focus
   useFocusEffect(
@@ -370,6 +375,44 @@ export default function TripDashboardScreen() {
     setEventLongitude(lon.toString());
   };
 
+  // Load weather forecast based on geotagged events coordinates
+  React.useEffect(() => {
+    const loadWeather = async () => {
+      const geoEvent = events.find(e => typeof e.latitude === 'number' && typeof e.longitude === 'number');
+      if (geoEvent) {
+        try {
+          setLoadingWeather(true);
+          const data = await fetchWeatherForecast(geoEvent.latitude!, geoEvent.longitude!);
+          setWeatherForecast(data);
+        } catch (e) {
+          console.error('Failed to load weather:', e);
+        } finally {
+          setLoadingWeather(false);
+        }
+      }
+    };
+    if (events.length > 0) {
+      loadWeather();
+    }
+  }, [events]);
+
+  const getWeatherForEvent = (event: Event) => {
+    if (!weatherForecast || !event.startTime) return null;
+    const dateStr = event.startTime.split(' ')[0]; // Extract YYYY-MM-DD
+    return weatherForecast.daily.find((d: any) => d.date === dateStr);
+  };
+
+  const getWeatherEmoji = (status: string) => {
+    switch (status) {
+      case 'sunny': return '☀️';
+      case 'cloudy': return '☁️';
+      case 'rainy': return '🌧️';
+      case 'snowy': return '❄️';
+      case 'stormy': return '⛈️';
+      default: return '☀️';
+    }
+  };
+
   // Web drag-and-drop events and file processors
   const handleDragOver = (e: any) => {
     e.preventDefault();
@@ -524,16 +567,24 @@ export default function TripDashboardScreen() {
     const rowDirectionStyle = { flexDirection: (isRTL ? 'row-reverse' : 'row') as 'row' | 'row-reverse' };
     const textAlignStyle = { textAlign: (isRTL ? 'right' : 'left') as 'left' | 'right' };
     const alignSelfStyle = { alignSelf: (isRTL ? 'flex-end' : 'flex-start') as 'flex-start' | 'flex-end' };
+    const weather = getWeatherForEvent(item);
 
     return (
       <View style={[styles.eventCard, { alignItems: isRTL ? 'flex-end' : 'flex-start' }]}>
         <View style={[styles.eventHeader, rowDirectionStyle]}>
           <Text style={[styles.eventTitle, textAlignStyle]}>{item.title}</Text>
-          <View style={[styles.badge, { backgroundColor: badge.bg, alignSelf: 'center' }]}>
+          <View style={[styles.badge, { backgroundColor: badge.bg, alignSelf: 'center', marginRight: isRTL ? 0 : 6, marginLeft: isRTL ? 6 : 0 }]}>
             <Text style={[styles.badgeText, { color: badge.text }]}>
               {t(`event.${item.type.toLowerCase()}`).toUpperCase()}
             </Text>
           </View>
+          {!isWeb && weather && (
+            <View style={[styles.mobileWeatherWidget, { marginLeft: isRTL ? 8 : 'auto', marginRight: isRTL ? 'auto' : 8 }]}>
+              <Text style={styles.mobileWeatherText}>
+                {getWeatherEmoji(weather.status)} {weather.temp}°C
+              </Text>
+            </View>
+          )}
         </View>
         
         <Text style={[styles.eventTime, textAlignStyle]}>
@@ -729,6 +780,33 @@ export default function TripDashboardScreen() {
       </View>
 
       <Text style={[styles.sectionTitle, textAlignStyle]}>{t('dashboard.itinerary')}</Text>
+
+      {/* Web Weekly Weather Panel */}
+      {isWeb && weatherForecast && (
+        <View style={styles.webWeatherPanel}>
+          <Text style={[styles.weatherPanelTitle, textAlignStyle]}>
+            🌤️ {isRTL ? 'תחזית מזג אוויר שבועית' : 'Weekly Weather Forecast'}
+          </Text>
+          <View style={[styles.webWeatherDaysRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+            {weatherForecast.daily.map((day: any, idx: number) => {
+              const dayName = new Date(day.date + 'T00:00:00').toLocaleDateString(isRTL ? 'he-IL' : 'en-US', { weekday: 'short' });
+              return (
+                <View key={idx} style={styles.webWeatherDayCard}>
+                  <Text style={styles.webWeatherDayName}>{dayName}</Text>
+                  <Text style={styles.webWeatherDate}>{day.date.split('-').slice(1).join('/')}</Text>
+                  <Text style={styles.webWeatherEmoji}>{getWeatherEmoji(day.status)}</Text>
+                  <Text style={styles.webWeatherTemp}>{day.temp}°C</Text>
+                  <Text style={styles.webWeatherRange}>🌅 {day.morningTemp}° / 🌃 {day.eveningTemp}°</Text>
+                  <View style={styles.webWeatherDetails}>
+                    <Text style={styles.webWeatherDetailText}>💧 {day.humidity}%</Text>
+                    <Text style={styles.webWeatherDetailText}>💨 {day.windSpeed}m/s</Text>
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        </View>
+      )}
 
       {loading ? (
         <View style={styles.loaderContainer}>
@@ -1831,5 +1909,87 @@ const styles = StyleSheet.create({
     fontFamily: typography.fontFamily,
     fontSize: typography.sizes.md,
     fontWeight: typography.weights.bold,
+  },
+  webWeatherPanel: {
+    backgroundColor: '#f8f9fa',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+  },
+  weatherPanelTitle: {
+    fontFamily: typography.fontFamily,
+    fontSize: typography.sizes.sm,
+    fontWeight: typography.weights.bold,
+    color: colors.text,
+    marginBottom: 12,
+  },
+  webWeatherDaysRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 10,
+  },
+  webWeatherDayCard: {
+    flex: 1,
+    backgroundColor: colors.white,
+    borderRadius: 8,
+    padding: 10,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e9ecef',
+  },
+  webWeatherDayName: {
+    fontFamily: typography.fontFamily,
+    fontSize: typography.sizes.xs,
+    fontWeight: typography.weights.bold,
+    color: colors.text,
+  },
+  webWeatherDate: {
+    fontFamily: typography.fontFamily,
+    fontSize: 10,
+    color: colors.textLight,
+    marginBottom: 6,
+  },
+  webWeatherEmoji: {
+    fontSize: 20,
+    marginVertical: 4,
+  },
+  webWeatherTemp: {
+    fontFamily: typography.fontFamily,
+    fontSize: typography.sizes.sm,
+    fontWeight: typography.weights.bold,
+    color: colors.text,
+  },
+  webWeatherRange: {
+    fontFamily: typography.fontFamily,
+    fontSize: 9,
+    color: colors.textLight,
+    marginVertical: 4,
+  },
+  webWeatherDetails: {
+    borderTopWidth: 1,
+    borderTopColor: '#f1f3f5',
+    width: '100%',
+    paddingTop: 4,
+    alignItems: 'center',
+  },
+  webWeatherDetailText: {
+    fontFamily: typography.fontFamily,
+    fontSize: 9,
+    color: colors.textLight,
+  },
+  mobileWeatherWidget: {
+    backgroundColor: '#f1f3f5',
+    borderRadius: 12,
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+    alignSelf: 'center',
+  },
+  mobileWeatherText: {
+    fontFamily: typography.fontFamily,
+    fontSize: 11,
+    fontWeight: typography.weights.bold,
+    color: '#495057',
   },
 });
