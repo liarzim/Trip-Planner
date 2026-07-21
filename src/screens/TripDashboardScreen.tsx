@@ -27,6 +27,8 @@ import { colors } from '../theme/colors';
 import { typography } from '../theme/typography';
 import { functions } from '../config/firebaseConfig';
 import { httpsCallable } from 'firebase/functions';
+import { useTranslation } from '../services/translationService';
+import LanguageSelector from '../components/LanguageSelector';
 
 type TripDashboardRouteProp = RouteProp<RootStackParamList, 'TripDashboard'>;
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'TripDashboard'>;
@@ -41,6 +43,8 @@ export default function TripDashboardScreen() {
   const route = useRoute<TripDashboardRouteProp>();
   const navigation = useNavigation<NavigationProp>();
   const { tripId } = route.params;
+
+  const { t, isRTL } = useTranslation();
 
   // Track network connectivity state
   const isOnline = useNetworkState();
@@ -351,41 +355,62 @@ export default function TripDashboardScreen() {
     const badge = getEventBadgeStyle(item.type);
     const hasCoordinates = typeof item.latitude === 'number' && typeof item.longitude === 'number';
 
+    const rowDirectionStyle = { flexDirection: (isRTL ? 'row-reverse' : 'row') as 'row' | 'row-reverse' };
+    const textAlignStyle = { textAlign: (isRTL ? 'right' : 'left') as 'left' | 'right' };
+    const alignSelfStyle = { alignSelf: (isRTL ? 'flex-end' : 'flex-start') as 'flex-start' | 'flex-end' };
+
     return (
-      <View style={styles.eventCard}>
-        <View style={styles.eventHeader}>
-          <Text style={styles.eventTitle}>{item.title}</Text>
-          <View style={[styles.badge, { backgroundColor: badge.bg }]}>
+      <View style={[styles.eventCard, { alignItems: isRTL ? 'flex-end' : 'flex-start' }]}>
+        <View style={[styles.eventHeader, rowDirectionStyle]}>
+          <Text style={[styles.eventTitle, textAlignStyle]}>{item.title}</Text>
+          <View style={[styles.badge, { backgroundColor: badge.bg, alignSelf: 'center' }]}>
             <Text style={[styles.badgeText, { color: badge.text }]}>
-              {item.type.toUpperCase()}
+              {t(`event.${item.type.toLowerCase()}`).toUpperCase()}
             </Text>
           </View>
         </View>
         
-        <Text style={styles.eventTime}>
-          ⏰  {item.startTime} {item.endTime ? `to ${item.endTime}` : ''}
+        <Text style={[styles.eventTime, textAlignStyle]}>
+          ⏰  {item.startTime} {item.endTime ? (isRTL ? `עד ${item.endTime}` : `to ${item.endTime}`) : ''}
         </Text>
 
+        {/* Notes/Description Rendering */}
+        {item.description ? (
+          <Text style={[
+            styles.eventDescription, 
+            isRTL ? styles.eventDescriptionRTL : null,
+            textAlignStyle
+          ]}>
+            {item.description}
+          </Text>
+        ) : null}
+
         {/* Action buttons under event */}
-        <View style={styles.eventActionsRow}>
+        <View style={[styles.eventActionsRow, rowDirectionStyle]}>
           {item.bookingReference ? (
             <TouchableOpacity 
-              style={styles.actionBtn} 
+              style={[styles.actionBtn, { marginRight: isRTL ? 0 : 8, marginLeft: isRTL ? 8 : 0 }]} 
               onPress={() => {
                 setSelectedBookingRef(item.bookingReference!);
                 setIsQrModalVisible(true);
               }}
+              activeOpacity={0.7}
             >
-              <Text style={styles.actionBtnText}>🎫  Ticket QR</Text>
+              <Text style={styles.actionBtnText}>🎫  {t('dashboard.ticket_qr')}</Text>
             </TouchableOpacity>
           ) : null}
 
           {hasCoordinates ? (
             <TouchableOpacity 
-              style={[styles.actionBtn, styles.actionBtnSecondary]} 
+              style={[
+                styles.actionBtn, 
+                styles.actionBtnSecondary,
+                { marginRight: isRTL ? 0 : 8, marginLeft: isRTL ? 8 : 0 }
+              ]} 
               onPress={() => handleNavigateKomoot(item.latitude!, item.longitude!)}
+              activeOpacity={0.7}
             >
-              <Text style={[styles.actionBtnText, styles.actionBtnTextSecondary]}>🚴  Komoot Map</Text>
+              <Text style={[styles.actionBtnText, styles.actionBtnTextSecondary]}>🚴  {t('dashboard.komoot_map')}</Text>
             </TouchableOpacity>
           ) : null}
         </View>
@@ -393,169 +418,208 @@ export default function TripDashboardScreen() {
     );
   };
 
-  const renderFooter = () => (
-    <View style={styles.footerSection}>
-      {/* Daily Checklist Section */}
-      <View style={styles.checklistCard}>
-        <Text style={styles.checklistTitle}>📋  Daily Packing & Checklist</Text>
-        {checklist.map((item) => (
+  const renderFooter = () => {
+    const rowDirectionStyle = { flexDirection: (isRTL ? 'row-reverse' : 'row') as 'row' | 'row-reverse' };
+    const textAlignStyle = { textAlign: (isRTL ? 'right' : 'left') as 'left' | 'right' };
+
+    return (
+      <View style={styles.footerSection}>
+        {/* Daily Checklist Section */}
+        <View style={styles.checklistCard}>
+          <Text style={[styles.checklistTitle, textAlignStyle]}>{t('dashboard.daily_checklist')}</Text>
+          {checklist.map((item) => (
+            <TouchableOpacity 
+              key={item.id} 
+              style={[styles.checklistItemRow, rowDirectionStyle]}
+              onPress={() => toggleChecklistItem(item.id)}
+              activeOpacity={0.7}
+            >
+              <View style={[
+                styles.checkbox, 
+                item.completed && styles.checkboxCompleted,
+                { marginRight: isRTL ? 0 : 12, marginLeft: isRTL ? 12 : 0 }
+              ]}>
+                {item.completed && <Text style={styles.checkboxTick}>✓</Text>}
+              </View>
+              <Text style={[
+                styles.checklistText, 
+                item.completed && styles.checklistTextCompleted,
+                { flex: 1, textAlign: isRTL ? 'right' : 'left' }
+              ]}>
+                {item.text}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* Import Itinerary DOCX Card */}
+        <View style={styles.importCard}>
+          <Text style={[styles.importTitle, textAlignStyle]}>{t('dashboard.import_title')}</Text>
+          <Text style={[styles.importSubtitle, textAlignStyle]}>
+            {t('dashboard.import_subtitle')}
+          </Text>
+
+          {Platform.OS === 'web' ? (
+            <TouchableOpacity
+              style={[
+                styles.dragZone,
+                isDragging && styles.dragZoneActive,
+              ]}
+              onPress={() => fileInputRef.current?.click()}
+              {...({
+                onDragOver: handleDragOver,
+                onDragLeave: handleDragLeave,
+                onDrop: handleDrop,
+              } as any)}
+              activeOpacity={0.8}
+            >
+              <input
+                type="file"
+                ref={fileInputRef}
+                accept=".docx"
+                style={{ display: 'none' }}
+                onChange={handleWebFileChange}
+              />
+              <Text style={styles.dragZoneEmoji}>📥</Text>
+              <Text style={styles.dragZoneText}>
+                {isDragging ? t('dashboard.drag_active') : t('dashboard.drag_idle')}
+              </Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={styles.mobilePickerBtn}
+              onPress={handlePickAndParseDocx}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.mobilePickerBtnText}>📁  {t('dashboard.choose_doc')}</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {/* Attached Documents Section */}
+        <View style={[styles.sectionHeaderRow, rowDirectionStyle]}>
+          <Text style={[styles.sectionTitle, textAlignStyle]}>{t('dashboard.attached_docs')}</Text>
           <TouchableOpacity 
-            key={item.id} 
-            style={styles.checklistItemRow}
-            onPress={() => toggleChecklistItem(item.id)}
+            style={styles.attachButton} 
+            onPress={handlePickAndUpload}
+            disabled={documentUploading}
             activeOpacity={0.7}
           >
-            <View style={[styles.checkbox, item.completed && styles.checkboxCompleted]}>
-              {item.completed && <Text style={styles.checkboxTick}>✓</Text>}
-            </View>
-            <Text style={[styles.checklistText, item.completed && styles.checklistTextCompleted]}>
-              {item.text}
-            </Text>
+            {documentUploading ? (
+              <ActivityIndicator size="small" color={colors.primary} />
+            ) : (
+              <Text style={styles.attachButtonText}>{t('dashboard.add_doc')}</Text>
+            )}
           </TouchableOpacity>
-        ))}
-      </View>
+        </View>
 
-      {/* Import Itinerary DOCX Card */}
-      <View style={styles.importCard}>
-        <Text style={styles.importTitle}>📄  Import Itinerary from Word</Text>
-        <Text style={styles.importSubtitle}>
-          Upload a Word document (.docx) to automatically extract event timelines, flights, locations, and booking confirmations.
-        </Text>
-
-        {Platform.OS === 'web' ? (
-          <TouchableOpacity
-            style={[
-              styles.dragZone,
-              isDragging && styles.dragZoneActive,
-            ]}
-            onPress={() => fileInputRef.current?.click()}
-            {...({
-              onDragOver: handleDragOver,
-              onDragLeave: handleDragLeave,
-              onDrop: handleDrop,
-            } as any)}
-            activeOpacity={0.8}
-          >
-            <input
-              type="file"
-              ref={fileInputRef}
-              accept=".docx"
-              style={{ display: 'none' }}
-              onChange={handleWebFileChange}
-            />
-            <Text style={styles.dragZoneEmoji}>📥</Text>
-            <Text style={styles.dragZoneText}>
-              {isDragging ? 'Drop your file here!' : 'Drag & Drop your .docx file here, or click to browse'}
-            </Text>
-          </TouchableOpacity>
+        {documents.length === 0 ? (
+          <View style={styles.emptyDocContainer}>
+            <Text style={styles.emptyDocText}>{t('dashboard.no_docs')}</Text>
+          </View>
         ) : (
-          <TouchableOpacity
-            style={styles.mobilePickerBtn}
-            onPress={handlePickAndParseDocx}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.mobilePickerBtnText}>📁  Choose Word Document (.docx)</Text>
-          </TouchableOpacity>
+          documents.map((doc) => {
+            const isDownloading = !!downloadingDocs[doc.id];
+            const isCached = !!cachedDocUris[doc.id];
+
+            return (
+              <View key={doc.id} style={[styles.docRow, rowDirectionStyle]}>
+                <View style={[styles.docRowInfo, rowDirectionStyle]}>
+                  <Text style={[styles.docEmoji, { marginRight: isRTL ? 0 : 8, marginLeft: isRTL ? 8 : 0 }]}>📄</Text>
+                  <Text style={[styles.docName, { textAlign: isRTL ? 'right' : 'left' }]} numberOfLines={1}>
+                    {doc.name}
+                  </Text>
+                  {isCached && (
+                    <Text style={[
+                      styles.offlineBadge,
+                      { marginLeft: isRTL ? 0 : 6, marginRight: isRTL ? 6 : 0 }
+                    ]}>
+                      {t('dashboard.offline_badge')}
+                    </Text>
+                  )}
+                </View>
+
+                <View style={[styles.docRowActions, rowDirectionStyle]}>
+                  {!isCached && (
+                    <TouchableOpacity
+                      style={[styles.docActionBtn, styles.downloadBtn, { marginRight: isRTL ? 6 : 0, marginLeft: isRTL ? 0 : 6 }]}
+                      onPress={() => handleMakeAvailableOffline(doc.id, doc.downloadUrl, doc.name)}
+                      disabled={isDownloading}
+                      activeOpacity={0.7}
+                    >
+                      {isDownloading ? (
+                        <ActivityIndicator size="small" color={colors.primary} />
+                      ) : (
+                        <Text style={styles.downloadBtnText}>{t('dashboard.keep_offline')}</Text>
+                      )}
+                    </TouchableOpacity>
+                  )}
+
+                  <TouchableOpacity
+                    style={[styles.docActionBtn, styles.openBtn]}
+                    onPress={() => handleOpenDocument(doc.id, doc.downloadUrl)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.openBtnText}>{t('dashboard.open_btn')}</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            );
+          })
         )}
       </View>
+    );
+  };
 
-      {/* Attached Documents Section */}
-      <View style={styles.sectionHeaderRow}>
-        <Text style={styles.sectionTitle}>Attached Documents</Text>
-        <TouchableOpacity 
-          style={styles.attachButton} 
-          onPress={handlePickAndUpload}
-          disabled={documentUploading}
-        >
-          {documentUploading ? (
-            <ActivityIndicator size="small" color={colors.primary} />
-          ) : (
-            <Text style={styles.attachButtonText}>+ Add Doc</Text>
-          )}
-        </TouchableOpacity>
-      </View>
-
-      {documents.length === 0 ? (
-        <View style={styles.emptyDocContainer}>
-          <Text style={styles.emptyDocText}>No documents attached yet.</Text>
-        </View>
-      ) : (
-        documents.map((doc) => {
-          const isDownloading = !!downloadingDocs[doc.id];
-          const isCached = !!cachedDocUris[doc.id];
-
-          return (
-            <View key={doc.id} style={styles.docRow}>
-              <View style={styles.docRowInfo}>
-                <Text style={styles.docEmoji}>📄</Text>
-                <Text style={styles.docName} numberOfLines={1}>
-                  {doc.name}
-                </Text>
-                {isCached && <Text style={styles.offlineBadge}>💾 Offline</Text>}
-              </View>
-
-              <View style={styles.docRowActions}>
-                {!isCached && (
-                  <TouchableOpacity
-                    style={[styles.docActionBtn, styles.downloadBtn]}
-                    onPress={() => handleMakeAvailableOffline(doc.id, doc.downloadUrl, doc.name)}
-                    disabled={isDownloading}
-                  >
-                    {isDownloading ? (
-                      <ActivityIndicator size="small" color={colors.primary} />
-                    ) : (
-                      <Text style={styles.downloadBtnText}>↓ Keep Offline</Text>
-                    )}
-                  </TouchableOpacity>
-                )}
-
-                <TouchableOpacity
-                  style={[styles.docActionBtn, styles.openBtn]}
-                  onPress={() => handleOpenDocument(doc.id, doc.downloadUrl)}
-                >
-                  <Text style={styles.openBtnText}>Open</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          );
-        })
-      )}
-    </View>
-  );
+  const rowDirectionStyle = { flexDirection: (isRTL ? 'row-reverse' : 'row') as 'row' | 'row-reverse' };
+  const textAlignStyle = { textAlign: (isRTL ? 'right' : 'left') as 'left' | 'right' };
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, rowDirectionStyle]}>
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.navigate('Home')}>
-          <Text style={styles.backText}>← Dashboard</Text>
+          <Text style={styles.backText}>{isRTL ? '→ הטיולים שלי' : '← Dashboard'}</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Trip Details</Text>
-        <TouchableOpacity 
-          style={styles.mapHeaderButton} 
-          onPress={() => navigation.navigate('TripMap', { tripId })}
-        >
-          <Text style={styles.mapHeaderText}>🗺️  Map</Text>
-        </TouchableOpacity>
+        <Text style={styles.headerTitle}>{t('dashboard.title')}</Text>
+        
+        <View style={[rowDirectionStyle, { alignItems: 'center' }]}>
+          <LanguageSelector />
+          <TouchableOpacity 
+            style={[
+              styles.mapHeaderButton, 
+              { 
+                marginLeft: isRTL ? 0 : 10, 
+                marginRight: isRTL ? 10 : 0 
+              }
+            ]} 
+            onPress={() => navigation.navigate('TripMap', { tripId })}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.mapHeaderText}>🗺️ {isRTL ? 'מפה' : 'Map'}</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Offline Mode Warning Banner */}
       {!isOnline && (
         <View style={styles.offlineBanner}>
           <Text style={styles.offlineBannerText}>
-            ⚠️  Offline Mode: Showing cached data. Changes will sync when online.
+            ⚠️  {t('dashboard.offline_mode')}
           </Text>
         </View>
       )}
 
-      <View style={styles.content}>
+      <View style={[styles.content, { direction: isRTL ? 'rtl' : 'ltr' }]}>
         {/* Total Spent Summary Card - Redesigned as Prominent Hero Card */}
         <View style={styles.summaryCard}>
-          <Text style={styles.summaryTitle}>Total Spent</Text>
+          <Text style={styles.summaryTitle}>{t('dashboard.total_spent')}</Text>
           <Text style={styles.summaryAmount}>${totalSpent.toFixed(2)} USD</Text>
-          <Text style={styles.summarySubtitle}>Logged from {expenses.length} expenses</Text>
+          <Text style={styles.summarySubtitle}>
+            {t('dashboard.logged_from', { count: expenses.length.toString() })}
+          </Text>
         </View>
 
-        <Text style={styles.sectionTitle}>Daily Itinerary & Events</Text>
+        <Text style={[styles.sectionTitle, textAlignStyle]}>{t('dashboard.itinerary')}</Text>
 
         {loading ? (
           <View style={styles.loaderContainer}>
@@ -570,8 +634,8 @@ export default function TripDashboardScreen() {
             ListFooterComponent={renderFooter}
             ListEmptyComponent={
               <View style={styles.emptyContainer}>
-                <Text style={styles.emptyText}>No events added to this trip yet.</Text>
-                <Text style={styles.emptySubText}>Start building your itinerary below!</Text>
+                <Text style={styles.emptyText}>{t('dashboard.no_events')}</Text>
+                <Text style={styles.emptySubText}>{t('dashboard.start_building')}</Text>
               </View>
             }
           />
@@ -579,18 +643,20 @@ export default function TripDashboardScreen() {
       </View>
 
       {/* Floating Action Button Container */}
-      <View style={styles.buttonRow}>
+      <View style={[styles.buttonRow, rowDirectionStyle]}>
         <TouchableOpacity 
           style={[styles.button, styles.eventButton]}
           onPress={() => navigation.navigate('AddEvent', { tripId })}
+          activeOpacity={0.8}
         >
-          <Text style={styles.buttonText}>+ Add Event</Text>
+          <Text style={styles.buttonText}>{t('dashboard.add_event')}</Text>
         </TouchableOpacity>
         <TouchableOpacity 
           style={[styles.button, styles.expenseButton]}
           onPress={() => navigation.navigate('AddExpense', { tripId })}
+          activeOpacity={0.8}
         >
-          <Text style={styles.buttonText}>+ Add Expense</Text>
+          <Text style={styles.buttonText}>{t('dashboard.add_expense')}</Text>
         </TouchableOpacity>
       </View>
 
@@ -614,6 +680,7 @@ export default function TripDashboardScreen() {
             <TouchableOpacity 
               style={styles.closeModalButton} 
               onPress={() => setIsQrModalVisible(false)}
+              activeOpacity={0.7}
             >
               <Text style={styles.closeModalButtonText}>Close</Text>
             </TouchableOpacity>
@@ -625,8 +692,8 @@ export default function TripDashboardScreen() {
       {parsing && (
         <View style={styles.parsingOverlay}>
           <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={styles.parsingText}>Analyzing document in the cloud...</Text>
-          <Text style={styles.parsingSubtitle}>Gemini is extracting your itinerary events...</Text>
+          <Text style={styles.parsingText}>{t('dashboard.analyzing')}</Text>
+          <Text style={styles.parsingSubtitle}>{t('dashboard.gemini_extracting')}</Text>
         </View>
       )}
     </SafeAreaView>
@@ -639,7 +706,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   header: {
-    flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 16,
@@ -650,7 +716,7 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
   },
   backButton: {
-    height: 44, // Touch target safety
+    height: 44,
     justifyContent: 'center',
     paddingHorizontal: 10,
   },
@@ -666,7 +732,7 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
   mapHeaderButton: {
-    height: 44, // Touch target safety
+    height: 44,
     justifyContent: 'center',
     paddingHorizontal: 10,
   },
@@ -756,12 +822,13 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.03,
     shadowRadius: 6,
     elevation: 1,
+    width: '100%',
   },
   eventHeader: {
-    flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 8,
+    width: '100%',
   },
   eventTitle: {
     fontFamily: typography.fontFamily,
@@ -769,7 +836,6 @@ const styles = StyleSheet.create({
     fontWeight: typography.weights.bold,
     color: colors.text,
     flex: 1,
-    marginRight: 8,
   },
   badge: {
     paddingVertical: 4,
@@ -785,11 +851,31 @@ const styles = StyleSheet.create({
     fontFamily: typography.fontFamily,
     fontSize: typography.sizes.sm,
     color: colors.textLight,
-    marginBottom: 12,
+    marginBottom: 6,
+  },
+  eventDescription: {
+    fontFamily: typography.fontFamily,
+    fontSize: typography.sizes.sm,
+    color: '#495057',
+    fontStyle: 'italic',
+    marginTop: 6,
+    marginBottom: 10,
+    backgroundColor: '#f8f9fa',
+    padding: 10,
+    borderRadius: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: '#228be6',
+    width: '100%',
+    boxSizing: 'border-box' as any,
+  },
+  eventDescriptionRTL: {
+    borderLeftWidth: 0,
+    borderRightWidth: 3,
+    borderRightColor: '#228be6',
   },
   eventActionsRow: {
-    flexDirection: 'row',
     marginTop: 4,
+    width: '100%',
   },
   actionBtn: {
     height: 38,
@@ -797,9 +883,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primaryLight,
     paddingHorizontal: 12,
     borderRadius: 8,
-    marginRight: 8,
     borderWidth: 1,
     borderColor: colors.border,
+    marginBottom: 4,
   },
   actionBtnText: {
     fontFamily: typography.fontFamily,
@@ -836,12 +922,11 @@ const styles = StyleSheet.create({
     bottom: 24,
     left: 20,
     right: 20,
-    flexDirection: 'row',
     justifyContent: 'space-between',
   },
   button: {
     flex: 1,
-    height: 48, // Touch target accessibility
+    height: 48,
     borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
@@ -888,11 +973,11 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   checklistItemRow: {
-    flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 10,
     borderBottomWidth: 1,
     borderBottomColor: colors.background,
+    width: '100%',
   },
   checkbox: {
     width: 22,
@@ -902,7 +987,6 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12,
   },
   checkboxCompleted: {
     borderColor: colors.primary,
@@ -924,10 +1008,10 @@ const styles = StyleSheet.create({
     textDecorationLine: 'line-through',
   },
   sectionHeaderRow: {
-    flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 12,
+    width: '100%',
   },
   attachButton: {
     height: 38,
@@ -951,6 +1035,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.border,
     borderStyle: 'dashed',
+    width: '100%',
   },
   emptyDocText: {
     fontFamily: typography.fontFamily,
@@ -958,7 +1043,6 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.sm,
   },
   docRow: {
-    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     backgroundColor: colors.card,
@@ -967,15 +1051,13 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     borderWidth: 1,
     borderColor: colors.border,
+    width: '100%',
   },
   docRowInfo: {
-    flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
-    marginRight: 8,
   },
   docEmoji: {
-    marginRight: 8,
     fontSize: 16,
   },
   docName: {
@@ -984,7 +1066,6 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.sm,
     fontWeight: typography.weights.medium,
     flex: 1,
-    marginRight: 6,
   },
   offlineBadge: {
     fontSize: 9,
@@ -996,7 +1077,6 @@ const styles = StyleSheet.create({
     fontWeight: typography.weights.bold,
   },
   docRowActions: {
-    flexDirection: 'row',
     alignItems: 'center',
   },
   docActionBtn: {
@@ -1004,7 +1084,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 10,
     borderRadius: 6,
-    marginLeft: 6,
   },
   downloadBtn: {
     backgroundColor: colors.primaryLight,
@@ -1076,7 +1155,7 @@ const styles = StyleSheet.create({
   },
   closeModalButton: {
     backgroundColor: colors.primary,
-    height: 44, // Touch target safety
+    height: 44,
     borderRadius: 8,
     width: '100%',
     alignItems: 'center',
@@ -1099,6 +1178,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.03,
     shadowRadius: 6,
     elevation: 1,
+    width: '100%',
   },
   importTitle: {
     fontFamily: typography.fontFamily,
@@ -1123,6 +1203,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#f4fbf7',
+    width: '100%',
   },
   dragZoneActive: {
     backgroundColor: '#e8f7ee',
@@ -1145,6 +1226,7 @@ const styles = StyleSheet.create({
     borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
+    width: '100%',
   },
   mobilePickerBtnText: {
     color: colors.white,

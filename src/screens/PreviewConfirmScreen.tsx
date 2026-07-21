@@ -16,6 +16,7 @@ import { createEvent } from '../services/dbService';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { colors } from '../theme/colors';
 import { typography } from '../theme/typography';
+import { useTranslation } from '../services/translationService';
 
 type PreviewConfirmRouteProp = RouteProp<RootStackParamList, 'PreviewConfirm'>;
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'PreviewConfirm'>;
@@ -36,6 +37,8 @@ export default function PreviewConfirmScreen() {
   const route = useRoute<PreviewConfirmRouteProp>();
   const navigation = useNavigation<NavigationProp>();
   const { tripId, parsedEvents } = route.params;
+
+  const { t, isRTL } = useTranslation();
 
   const [events, setEvents] = useState<ParsedEvent[]>(
     parsedEvents.map(e => ({
@@ -111,7 +114,7 @@ export default function PreviewConfirmScreen() {
         })
       );
 
-      alert(`Successfully saved ${events.length} events to your trip!`);
+      alert(isRTL ? `שמר בהצלחה ${events.length} אירועים לטיול שלך!` : `Successfully saved ${events.length} events to your trip!`);
       navigation.navigate('TripDashboard', { tripId });
     } catch (err: any) {
       setError(err.message || 'Failed to save events to trip.');
@@ -122,39 +125,42 @@ export default function PreviewConfirmScreen() {
 
   const isWeb = Platform.OS === 'web';
 
+  const textAlignStyle = { textAlign: (isRTL ? 'right' : 'left') as 'left' | 'right' };
+  const rowDirectionStyle = { flexDirection: (isRTL ? 'row-reverse' : 'row') as 'row' | 'row-reverse' };
+
   const renderWebTable = () => (
     <ScrollView horizontal style={styles.webScrollHorizontal}>
       <View style={styles.tableContainer}>
         {/* Table Header */}
-        <View style={[styles.tableRow, styles.tableHeader]}>
-          <Text style={[styles.tableHeaderCell, { width: 180 }]}>Event Title *</Text>
-          <Text style={[styles.tableHeaderCell, { width: 180 }]}>Type *</Text>
-          <Text style={[styles.tableHeaderCell, { width: 120 }]}>Date (YYYY-MM-DD) *</Text>
-          <Text style={[styles.tableHeaderCell, { width: 100 }]}>Start Time</Text>
-          <Text style={[styles.tableHeaderCell, { width: 100 }]}>End Time</Text>
-          <Text style={[styles.tableHeaderCell, { width: 150 }]}>Location</Text>
-          <Text style={[styles.tableHeaderCell, { width: 130 }]}>Booking Ref</Text>
-          <Text style={[styles.tableHeaderCell, { width: 80, textAlign: 'center' }]}>Action</Text>
+        <View style={[styles.tableRow, styles.tableHeader, rowDirectionStyle]}>
+          <Text style={[styles.tableHeaderCell, { width: 180 }, textAlignStyle]}>{isRTL ? 'שם האירוע *' : 'Event Title *'}</Text>
+          <Text style={[styles.tableHeaderCell, { width: 180 }, textAlignStyle]}>{isRTL ? 'סוג *' : 'Type *'}</Text>
+          <Text style={[styles.tableHeaderCell, { width: 130 }, textAlignStyle]}>{isRTL ? 'תאריך *' : 'Date *'}</Text>
+          <Text style={[styles.tableHeaderCell, { width: 100 }, textAlignStyle]}>{isRTL ? 'שעת התחלה' : 'Start Time'}</Text>
+          <Text style={[styles.tableHeaderCell, { width: 100 }, textAlignStyle]}>{isRTL ? 'שעת סיום' : 'End Time'}</Text>
+          <Text style={[styles.tableHeaderCell, { width: 150 }, textAlignStyle]}>{isRTL ? 'מיקום' : 'Location'}</Text>
+          <Text style={[styles.tableHeaderCell, { width: 130 }, textAlignStyle]}>{isRTL ? 'מספר הזמנה' : 'Booking Ref'}</Text>
+          <Text style={[styles.tableHeaderCell, { width: 80, textAlign: 'center' }]}>{isRTL ? 'פעולה' : 'Action'}</Text>
         </View>
 
         {/* Table Body */}
         {events.length === 0 ? (
           <View style={styles.emptyTable}>
-            <Text style={styles.emptyTableText}>No events to display. All events were deleted.</Text>
+            <Text style={styles.emptyTableText}>{isRTL ? 'אין אירועים להצגה.' : 'No events to display. All events were deleted.'}</Text>
           </View>
         ) : (
           events.map((item, index) => (
-            <View key={index} style={styles.tableRow}>
+            <View key={index} style={[styles.tableRow, rowDirectionStyle]}>
               <View style={{ width: 180, paddingHorizontal: 4 }}>
                 <TextInput
-                  style={styles.tableInput}
+                  style={[styles.tableInput, textAlignStyle]}
                   value={item.title}
                   onChangeText={(val) => handleFieldChange(index, 'title', val)}
                   placeholder="Flight UA123"
                 />
               </View>
               <View style={{ width: 180, paddingHorizontal: 4 }}>
-                <View style={styles.tableTypeSelector}>
+                <View style={[styles.tableTypeSelector, rowDirectionStyle]}>
                   {['flight', 'hotel', 'restaurant', 'activity', 'other'].map((typeVal) => (
                     <TouchableOpacity
                       key={typeVal}
@@ -163,6 +169,7 @@ export default function PreviewConfirmScreen() {
                         item.type === typeVal && styles.tableTypeBtnActive,
                       ]}
                       onPress={() => handleFieldChange(index, 'type', typeVal)}
+                      activeOpacity={0.7}
                     >
                       <Text
                         style={[
@@ -176,9 +183,9 @@ export default function PreviewConfirmScreen() {
                   ))}
                 </View>
               </View>
-              <View style={{ width: 120, paddingHorizontal: 4 }}>
+              <View style={{ width: 130, paddingHorizontal: 4 }}>
                 <TextInput
-                  style={styles.tableInput}
+                  style={[styles.tableInput, textAlignStyle]}
                   value={item.date}
                   onChangeText={(val) => handleFieldChange(index, 'date', val)}
                   placeholder="YYYY-MM-DD"
@@ -186,7 +193,7 @@ export default function PreviewConfirmScreen() {
               </View>
               <View style={{ width: 100, paddingHorizontal: 4 }}>
                 <TextInput
-                  style={styles.tableInput}
+                  style={[styles.tableInput, textAlignStyle]}
                   value={item.startTime}
                   onChangeText={(val) => handleFieldChange(index, 'startTime', val)}
                   placeholder="14:30"
@@ -194,7 +201,7 @@ export default function PreviewConfirmScreen() {
               </View>
               <View style={{ width: 100, paddingHorizontal: 4 }}>
                 <TextInput
-                  style={styles.tableInput}
+                  style={[styles.tableInput, textAlignStyle]}
                   value={item.endTime}
                   onChangeText={(val) => handleFieldChange(index, 'endTime', val)}
                   placeholder="18:00"
@@ -202,7 +209,7 @@ export default function PreviewConfirmScreen() {
               </View>
               <View style={{ width: 150, paddingHorizontal: 4 }}>
                 <TextInput
-                  style={styles.tableInput}
+                  style={[styles.tableInput, textAlignStyle]}
                   value={item.location}
                   onChangeText={(val) => handleFieldChange(index, 'location', val)}
                   placeholder="Paris, France"
@@ -210,7 +217,7 @@ export default function PreviewConfirmScreen() {
               </View>
               <View style={{ width: 130, paddingHorizontal: 4 }}>
                 <TextInput
-                  style={styles.tableInput}
+                  style={[styles.tableInput, textAlignStyle]}
                   value={item.bookingReference}
                   onChangeText={(val) => handleFieldChange(index, 'bookingReference', val)}
                   placeholder="REF123"
@@ -220,6 +227,7 @@ export default function PreviewConfirmScreen() {
                 <TouchableOpacity
                   style={styles.deleteButton}
                   onPress={() => handleDeleteRow(index)}
+                  activeOpacity={0.7}
                 >
                   <Text style={styles.deleteButtonText}>✕</Text>
                 </TouchableOpacity>
@@ -235,34 +243,35 @@ export default function PreviewConfirmScreen() {
     <ScrollView contentContainerStyle={styles.mobileCardsContainer}>
       {events.length === 0 ? (
         <View style={styles.emptyTable}>
-          <Text style={styles.emptyTableText}>No events to display. All events were deleted.</Text>
+          <Text style={styles.emptyTableText}>{isRTL ? 'אין אירועים להצגה.' : 'No events to display. All events were deleted.'}</Text>
         </View>
       ) : (
         events.map((item, index) => (
-          <View key={index} style={styles.eventCard}>
-            <View style={styles.cardHeaderRow}>
-              <Text style={styles.cardIndexText}>Event #{index + 1}</Text>
+          <View key={index} style={[styles.eventCard, { alignItems: isRTL ? 'flex-end' : 'flex-start' }]}>
+            <View style={[styles.cardHeaderRow, rowDirectionStyle]}>
+              <Text style={styles.cardIndexText}>{isRTL ? `אירוע #${index + 1}` : `Event #${index + 1}`}</Text>
               <TouchableOpacity
                 style={styles.mobileDeleteBtn}
                 onPress={() => handleDeleteRow(index)}
+                activeOpacity={0.7}
               >
-                <Text style={styles.mobileDeleteBtnText}>Remove</Text>
+                <Text style={styles.mobileDeleteBtnText}>{isRTL ? 'הסר' : 'Remove'}</Text>
               </TouchableOpacity>
             </View>
 
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Title *</Text>
+            <View style={[styles.inputGroup, { width: '100%' }]}>
+              <Text style={[styles.label, textAlignStyle]}>{isRTL ? 'שם האירוע *' : 'Title *'}</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, textAlignStyle]}
                 value={item.title}
                 onChangeText={(val) => handleFieldChange(index, 'title', val)}
                 placeholder="Flight UA123"
               />
             </View>
 
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Type *</Text>
-              <View style={styles.typeSelector}>
+            <View style={[styles.inputGroup, { width: '100%' }]}>
+              <Text style={[styles.label, textAlignStyle]}>{isRTL ? 'סוג *' : 'Type *'}</Text>
+              <View style={[styles.typeSelector, rowDirectionStyle]}>
                 {['flight', 'hotel', 'restaurant', 'activity', 'other'].map((typeVal) => (
                   <TouchableOpacity
                     key={typeVal}
@@ -271,6 +280,7 @@ export default function PreviewConfirmScreen() {
                       item.type === typeVal && styles.typeSelectorBtnActive,
                     ]}
                     onPress={() => handleFieldChange(index, 'type', typeVal)}
+                    activeOpacity={0.7}
                   >
                     <Text
                       style={[
@@ -285,20 +295,20 @@ export default function PreviewConfirmScreen() {
               </View>
             </View>
 
-            <View style={styles.row}>
-              <View style={[styles.inputGroup, { flex: 1, marginRight: 8 }]}>
-                <Text style={styles.label}>Date *</Text>
+            <View style={[styles.row, rowDirectionStyle, { width: '100%' }]}>
+              <View style={[styles.inputGroup, { flex: 1, marginRight: isRTL ? 0 : 8, marginLeft: isRTL ? 8 : 0 }]}>
+                <Text style={[styles.label, textAlignStyle]}>{isRTL ? 'תאריך *' : 'Date *'}</Text>
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, textAlignStyle]}
                   value={item.date}
                   onChangeText={(val) => handleFieldChange(index, 'date', val)}
                   placeholder="YYYY-MM-DD"
                 />
               </View>
-              <View style={[styles.inputGroup, { flex: 1, marginLeft: 8 }]}>
-                <Text style={styles.label}>Start Time</Text>
+              <View style={[styles.inputGroup, { flex: 1, marginRight: isRTL ? 8 : 0, marginLeft: isRTL ? 0 : 8 }]}>
+                <Text style={[styles.label, textAlignStyle]}>{isRTL ? 'שעת התחלה' : 'Start Time'}</Text>
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, textAlignStyle]}
                   value={item.startTime}
                   onChangeText={(val) => handleFieldChange(index, 'startTime', val)}
                   placeholder="14:30"
@@ -306,20 +316,20 @@ export default function PreviewConfirmScreen() {
               </View>
             </View>
 
-            <View style={styles.row}>
-              <View style={[styles.inputGroup, { flex: 1, marginRight: 8 }]}>
-                <Text style={styles.label}>End Time</Text>
+            <View style={[styles.row, rowDirectionStyle, { width: '100%' }]}>
+              <View style={[styles.inputGroup, { flex: 1, marginRight: isRTL ? 0 : 8, marginLeft: isRTL ? 8 : 0 }]}>
+                <Text style={[styles.label, textAlignStyle]}>{isRTL ? 'שעת סיום' : 'End Time'}</Text>
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, textAlignStyle]}
                   value={item.endTime}
                   onChangeText={(val) => handleFieldChange(index, 'endTime', val)}
                   placeholder="18:00"
                 />
               </View>
-              <View style={[styles.inputGroup, { flex: 1, marginLeft: 8 }]}>
-                <Text style={styles.label}>Booking Ref</Text>
+              <View style={[styles.inputGroup, { flex: 1, marginRight: isRTL ? 8 : 0, marginLeft: isRTL ? 0 : 8 }]}>
+                <Text style={[styles.label, textAlignStyle]}>{isRTL ? 'מספר הזמנה' : 'Booking Ref'}</Text>
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, textAlignStyle]}
                   value={item.bookingReference}
                   onChangeText={(val) => handleFieldChange(index, 'bookingReference', val)}
                   placeholder="LH123"
@@ -327,10 +337,10 @@ export default function PreviewConfirmScreen() {
               </View>
             </View>
 
-            <View style={styles.inputGroup}>
-              <Text style={styles.label}>Location</Text>
+            <View style={[styles.inputGroup, { width: '100%' }]}>
+              <Text style={[styles.label, textAlignStyle]}>{isRTL ? 'מיקום' : 'Location'}</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, textAlignStyle]}
                 value={item.location}
                 onChangeText={(val) => handleFieldChange(index, 'location', val)}
                 placeholder="Paris, France"
@@ -344,37 +354,41 @@ export default function PreviewConfirmScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, rowDirectionStyle]}>
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => navigation.navigate('TripDashboard', { tripId })}
         >
-          <Text style={styles.backText}>Cancel</Text>
+          <Text style={styles.backText}>{t('preview.cancel_btn')}</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Preview & Confirm Itinerary</Text>
+        <Text style={styles.headerTitle}>{t('preview.title')}</Text>
         <TouchableOpacity
           style={styles.saveHeaderButton}
           onPress={handleSaveAll}
           disabled={saving || events.length === 0}
+          activeOpacity={0.7}
         >
           {saving ? (
             <ActivityIndicator size="small" color={colors.white} />
           ) : (
-            <Text style={styles.saveHeaderText}>Save to Trip</Text>
+            <Text style={styles.saveHeaderText}>{isRTL ? 'שמור' : 'Save'}</Text>
           )}
         </TouchableOpacity>
       </View>
 
-      <View style={styles.introCard}>
-        <Text style={styles.introTitle}>🔍  Extracted Itinerary Events</Text>
-        <Text style={styles.introSubtitle}>
-          We found {events.length} events. Please review, edit, or delete items before saving them.
+      <View style={[styles.introCard, { alignItems: isRTL ? 'flex-end' : 'flex-start' }]}>
+        <Text style={styles.introTitle}>🔍  {isRTL ? 'אירועים שחולצו' : 'Extracted Itinerary Events'}</Text>
+        <Text style={[styles.introSubtitle, textAlignStyle]}>
+          {isRTL 
+            ? `מצאנו ${events.length} אירועים. אנא בדוק, ערוך או מחק פריטים לפני שמירתם.`
+            : `We found ${events.length} events. Please review, edit, or delete items before saving them.`
+          }
         </Text>
       </View>
 
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
-      <View style={styles.content}>
+      <View style={[styles.content, { direction: isRTL ? 'rtl' : 'ltr' }]}>
         {isWeb ? renderWebTable() : renderMobileCards()}
       </View>
 
@@ -385,12 +399,13 @@ export default function PreviewConfirmScreen() {
             style={styles.webSaveButton}
             onPress={handleSaveAll}
             disabled={saving || events.length === 0}
+            activeOpacity={0.8}
           >
             {saving ? (
               <ActivityIndicator color={colors.white} />
             ) : (
               <Text style={styles.mobileSaveButtonText}>
-                Save {events.length} Events to Trip
+                {isRTL ? `שמור ${events.length} אירועים לטיול` : `Save ${events.length} Events to Trip`}
               </Text>
             )}
           </TouchableOpacity>
@@ -401,12 +416,13 @@ export default function PreviewConfirmScreen() {
             style={styles.mobileSaveButton}
             onPress={handleSaveAll}
             disabled={saving || events.length === 0}
+            activeOpacity={0.8}
           >
             {saving ? (
               <ActivityIndicator color={colors.white} />
             ) : (
               <Text style={styles.mobileSaveButtonText}>
-                Save {events.length} Events to Trip
+                {isRTL ? `שמור ${events.length} אירועים לטיול` : `Save ${events.length} Events to Trip`}
               </Text>
             )}
           </TouchableOpacity>
@@ -422,7 +438,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   header: {
-    flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 16,
@@ -499,7 +514,6 @@ const styles = StyleSheet.create({
     padding: 20,
   },
   tableRow: {
-    flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 8,
     borderBottomWidth: 1,
@@ -529,9 +543,10 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
     fontSize: typography.sizes.sm,
     color: colors.text,
+    width: '100%',
   },
   tableTypeSelector: {
-    flexDirection: 'row',
+    width: '100%',
   },
   tableTypeBtn: {
     borderWidth: 1,
@@ -589,15 +604,16 @@ const styles = StyleSheet.create({
     marginBottom: 16,
     borderWidth: 1,
     borderColor: colors.border,
+    width: '100%',
   },
   cardHeaderRow: {
-    flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 12,
     borderBottomWidth: 1,
     borderBottomColor: colors.background,
     paddingBottom: 8,
+    width: '100%',
   },
   cardIndexText: {
     fontFamily: typography.fontFamily,
@@ -638,8 +654,6 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
   typeSelector: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
     marginTop: 4,
   },
   typeSelectorBtn: {
@@ -666,7 +680,7 @@ const styles = StyleSheet.create({
     fontWeight: typography.weights.bold,
   },
   row: {
-    flexDirection: 'row',
+    // Row style handled dynamically
   },
   mobileFooter: {
     padding: 16,

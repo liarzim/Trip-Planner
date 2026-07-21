@@ -17,6 +17,8 @@ import { Trip } from '../types';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { colors } from '../theme/colors';
 import { typography } from '../theme/typography';
+import { useTranslation } from '../services/translationService';
+import LanguageSelector from '../components/LanguageSelector';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'Home'>;
 
@@ -25,10 +27,11 @@ export default function HomeScreen() {
   const [trips, setTrips] = useState<Trip[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const { t, isRTL } = useTranslation();
+
   const user = auth.currentUser;
   const welcomeName = user?.displayName || user?.email || 'Traveler';
 
-  // Fetch trips from Firestore whenever the screen comes into focus
   useFocusEffect(
     React.useCallback(() => {
       let active = true;
@@ -78,44 +81,65 @@ export default function HomeScreen() {
 
   const renderTripItem = ({ item }: { item: Trip }) => {
     const statusStyle = getStatusBadgeStyle(item.status);
+    const dateRange = isRTL 
+      ? `📅  ${item.startDate} עד ${item.endDate}` 
+      : `📅  ${item.startDate} to ${item.endDate}`;
+
     return (
       <TouchableOpacity 
-        style={styles.tripCard}
+        style={[styles.tripCard, { direction: isRTL ? 'rtl' : 'ltr' }]}
         onPress={() => navigation.navigate('TripDashboard', { tripId: item.id })}
         activeOpacity={0.8}
       >
-        <View style={styles.cardHeader}>
-          <Text style={styles.tripName} numberOfLines={1}>{item.name}</Text>
+        <View style={[styles.cardHeader, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+          <Text style={[styles.tripName, { textAlign: isRTL ? 'right' : 'left' }]} numberOfLines={1}>
+            {item.name}
+          </Text>
           <View style={[styles.statusBadge, { backgroundColor: statusStyle.bg }]}>
             <Text style={[styles.statusText, { color: statusStyle.text }]}>
-              {item.status.toUpperCase()}
+              {t(`home.${item.status.toLowerCase()}`).toUpperCase()}
             </Text>
           </View>
         </View>
-        <View style={styles.cardFooter}>
-          <Text style={styles.tripDate}>
-            📅  {item.startDate} to {item.endDate}
+        <View style={[styles.cardFooter, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+          <Text style={[styles.tripDate, { textAlign: isRTL ? 'right' : 'left' }]}>
+            {dateRange}
           </Text>
-          <Text style={styles.arrowIcon}>→</Text>
+          <Text style={[styles.arrowIcon, { transform: [{ scaleX: isRTL ? -1 : 1 }] }]}>→</Text>
         </View>
       </TouchableOpacity>
     );
   };
 
+  const rowDirectionStyle = { flexDirection: (isRTL ? 'row-reverse' : 'row') as 'row' | 'row-reverse' };
+  const textAlignStyle = { textAlign: (isRTL ? 'right' : 'left') as 'left' | 'right' };
+
   return (
     <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.welcomeText}>Hello,</Text>
+      <View style={[styles.header, rowDirectionStyle]}>
+        <View style={{ alignItems: isRTL ? 'flex-end' : 'flex-start' }}>
+          <Text style={styles.welcomeText}>{t('home.welcome')},</Text>
           <Text style={styles.userName}>{welcomeName}</Text>
         </View>
-        <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
-          <Text style={styles.signOutText}>Sign Out</Text>
-        </TouchableOpacity>
+        <View style={[styles.headerRight, rowDirectionStyle]}>
+          <LanguageSelector />
+          <TouchableOpacity 
+            style={[
+              styles.signOutButton, 
+              { 
+                marginLeft: isRTL ? 0 : 10, 
+                marginRight: isRTL ? 10 : 0 
+              }
+            ]} 
+            onPress={handleSignOut}
+          >
+            <Text style={styles.signOutText}>{t('home.sign_out')}</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
-      <View style={styles.content}>
-        <Text style={styles.sectionTitle}>Your Upcoming Trips</Text>
+      <View style={[styles.content, { direction: isRTL ? 'rtl' : 'ltr' }]}>
+        <Text style={[styles.sectionTitle, textAlignStyle]}>{t('home.my_trips')}</Text>
         
         {loading ? (
           <View style={styles.loaderContainer}>
@@ -129,8 +153,8 @@ export default function HomeScreen() {
             contentContainerStyle={styles.listContainer}
             ListEmptyComponent={
               <View style={styles.emptyContainer}>
-                <Text style={styles.emptyText}>No trips scheduled yet.</Text>
-                <Text style={styles.emptySubText}>Tap below to plan your first adventure!</Text>
+                <Text style={styles.emptyText}>{t('home.no_trips')}</Text>
+                <Text style={styles.emptySubText}>{t('home.create_first')}</Text>
               </View>
             }
           />
@@ -139,11 +163,14 @@ export default function HomeScreen() {
 
       {/* Floating Action Button for Trip Creation */}
       <TouchableOpacity 
-        style={styles.fab} 
+        style={[
+          styles.fab, 
+          isRTL ? { left: 24, right: undefined } : { right: 24, left: undefined }
+        ]} 
         onPress={() => navigation.navigate('CreateTrip')}
         activeOpacity={0.9}
       >
-        <Text style={styles.fabText}>+ Plan Trip</Text>
+        <Text style={styles.fabText}>+ {t('home.add_trip')}</Text>
       </TouchableOpacity>
     </SafeAreaView>
   );
@@ -155,7 +182,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   header: {
-    flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
@@ -164,6 +190,9 @@ const styles = StyleSheet.create({
     backgroundColor: colors.card,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
+  },
+  headerRight: {
+    alignItems: 'center',
   },
   welcomeText: {
     fontFamily: typography.fontFamily,
@@ -177,9 +206,9 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
   signOutButton: {
-    height: 44, // Mobile accessibility target
-    paddingHorizontal: 16,
-    borderRadius: 22,
+    height: 38,
+    paddingHorizontal: 14,
+    borderRadius: 19,
     backgroundColor: '#fff5f5',
     borderWidth: 1,
     borderColor: '#ffe3e3',
@@ -222,10 +251,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.04,
     shadowRadius: 10,
     elevation: 3,
-    minHeight: 88, // Ensure robust touch safety
+    minHeight: 88,
   },
   cardHeader: {
-    flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 12,
@@ -236,7 +264,6 @@ const styles = StyleSheet.create({
     fontWeight: typography.weights.bold,
     color: colors.text,
     flex: 1,
-    marginRight: 8,
   },
   statusBadge: {
     paddingVertical: 4,
@@ -249,7 +276,6 @@ const styles = StyleSheet.create({
     fontWeight: typography.weights.bold,
   },
   cardFooter: {
-    flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
   },
@@ -257,6 +283,7 @@ const styles = StyleSheet.create({
     fontFamily: typography.fontFamily,
     fontSize: typography.sizes.sm,
     color: colors.textLight,
+    flex: 1,
   },
   arrowIcon: {
     fontSize: 16,
@@ -285,9 +312,8 @@ const styles = StyleSheet.create({
   fab: {
     position: 'absolute',
     bottom: 24,
-    right: 24,
     backgroundColor: colors.primary,
-    height: 48, // Accessibility target
+    height: 48,
     paddingHorizontal: 24,
     borderRadius: 24,
     flexDirection: 'row',

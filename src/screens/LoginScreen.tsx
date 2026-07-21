@@ -12,6 +12,7 @@ import {
   Keyboard,
 } from 'react-native';
 import { loginUser, registerUser, loginWithGoogle } from '../services/authService';
+import { useTranslation } from '../services/translationService';
 
 export default function LoginScreen() {
   const [isLogin, setIsLogin] = useState(true);
@@ -21,9 +22,11 @@ export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  const { t, isRTL } = useTranslation();
+
   const handleSubmit = async () => {
     if (!email || !password || (!isLogin && !displayName)) {
-      setError('Please fill in all fields.');
+      setError(t('expense.required_error'));
       return;
     }
     setError('');
@@ -54,25 +57,35 @@ export default function LoginScreen() {
     }
   };
 
+  const textAlignStyle = { textAlign: (isRTL ? 'right' : 'left') as 'left' | 'right' };
+
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.container}
       >
-        <View style={styles.card}>
-          <Text style={styles.title}>{isLogin ? 'Welcome Back' : 'Create Account'}</Text>
+        <View style={[styles.card, { direction: isRTL ? 'rtl' : 'ltr' }]}>
+          <Text style={styles.title}>
+            {isLogin 
+              ? (isRTL ? 'ברוכים הבאים' : 'Welcome Back')
+              : (isRTL ? 'יצירת חשבון' : 'Create Account')
+            }
+          </Text>
           <Text style={styles.subtitle}>
-            {isLogin ? 'Sign in to manage your trips' : 'Join and start planning trips together'}
+            {isLogin 
+              ? t('login.subtitle')
+              : (isRTL ? 'הצטרף והתחל לתכנן טיולים ביחד' : 'Join and start planning trips together')
+            }
           </Text>
 
           {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
           {!isLogin && (
             <View style={styles.inputContainer}>
-              <Text style={styles.label}>Full Name</Text>
+              <Text style={[styles.label, textAlignStyle]}>{t('login.name')}</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, textAlignStyle]}
                 placeholder="John Doe"
                 value={displayName}
                 onChangeText={setDisplayName}
@@ -82,9 +95,9 @@ export default function LoginScreen() {
           )}
 
           <View style={styles.inputContainer}>
-            <Text style={styles.label}>Email Address</Text>
+            <Text style={[styles.label, textAlignStyle]}>{t('login.email')}</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, textAlignStyle]}
               placeholder="name@example.com"
               value={email}
               onChangeText={setEmail}
@@ -95,9 +108,9 @@ export default function LoginScreen() {
           </View>
 
           <View style={styles.inputContainer}>
-            <Text style={styles.label}>Password</Text>
+            <Text style={[styles.label, textAlignStyle]}>{t('login.password')}</Text>
             <TextInput
-              style={styles.input}
+              style={[styles.input, textAlignStyle]}
               placeholder="••••••••"
               value={password}
               onChangeText={setPassword}
@@ -111,12 +124,13 @@ export default function LoginScreen() {
             style={styles.primaryButton}
             onPress={handleSubmit}
             disabled={loading}
+            activeOpacity={0.8}
           >
             {loading ? (
               <ActivityIndicator color="#ffffff" />
             ) : (
               <Text style={styles.primaryButtonText}>
-                {isLogin ? 'Sign In' : 'Sign Up'}
+                {isLogin ? t('login.button') : t('login.signup_button')}
               </Text>
             )}
           </TouchableOpacity>
@@ -124,7 +138,7 @@ export default function LoginScreen() {
           {/* Social Sign-In Divider */}
           <View style={styles.dividerContainer}>
             <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>or</Text>
+            <Text style={styles.dividerText}>{isRTL ? 'או' : 'or'}</Text>
             <View style={styles.dividerLine} />
           </View>
 
@@ -133,8 +147,11 @@ export default function LoginScreen() {
             style={styles.googleButton}
             onPress={handleGoogleSignIn}
             disabled={loading}
+            activeOpacity={0.8}
           >
-            <Text style={styles.googleButtonText}>🔵  Sign In with Google</Text>
+            <Text style={styles.googleButtonText}>
+              🔵  {isRTL ? 'התחבר עם Google' : 'Sign In with Google'}
+            </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -144,11 +161,10 @@ export default function LoginScreen() {
               setError('');
             }}
             disabled={loading}
+            activeOpacity={0.7}
           >
             <Text style={styles.toggleButtonText}>
-              {isLogin
-                ? "Don't have an account? Sign Up"
-                : 'Already have an account? Sign In'}
+              {isLogin ? t('login.switch_signup') : t('login.switch_signin')}
             </Text>
           </TouchableOpacity>
         </View>

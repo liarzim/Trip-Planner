@@ -40,6 +40,7 @@ export interface Event {
   latitude?: number;
   longitude?: number;
   bookingReference?: string;
+  description?: string;
 }
 
 export interface Document {

@@ -16,6 +16,7 @@ import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { createExpense } from '../services/dbService';
 import { RootStackParamList } from '../navigation/AppNavigator';
+import { useTranslation } from '../services/translationService';
 
 type AddExpenseRouteProp = RouteProp<RootStackParamList, 'AddExpense'>;
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'AddExpense'>;
@@ -24,6 +25,8 @@ export default function AddExpenseScreen() {
   const route = useRoute<AddExpenseRouteProp>();
   const navigation = useNavigation<NavigationProp>();
   const { tripId } = route.params;
+
+  const { t, isRTL } = useTranslation();
 
   const [amount, setAmount] = useState('');
   const [currency, setCurrency] = useState('USD');
@@ -34,7 +37,7 @@ export default function AddExpenseScreen() {
 
   const handleSave = async () => {
     if (!amount || !currency || !category || !description) {
-      setError('Please fill in all fields.');
+      setError(t('expense.required_error'));
       return;
     }
 
@@ -48,10 +51,7 @@ export default function AddExpenseScreen() {
     setLoading(true);
 
     try {
-      // Connect to Firestore createExpense function
       await createExpense(tripId, parsedAmount, currency, category, description);
-      
-      // Navigate back to TripDashboardScreen
       navigation.goBack();
     } catch (err: any) {
       setError(err.message || 'Failed to save expense.');
@@ -62,18 +62,21 @@ export default function AddExpenseScreen() {
 
   const categories = ['Food', 'Transport', 'Accommodation', 'Other'];
 
+  const textAlignStyle = { textAlign: (isRTL ? 'right' : 'left') as 'left' | 'right' };
+  const rowDirectionStyle = { flexDirection: (isRTL ? 'row-reverse' : 'row') as 'row' | 'row-reverse' };
+
   const renderFormContent = () => (
     <ScrollView contentContainerStyle={styles.scrollContainer}>
-      <View style={styles.card}>
-        <Text style={styles.title}>Track Expense</Text>
-        <Text style={styles.subtitle}>Enter details to log an expense for this trip</Text>
+      <View style={[styles.card, { direction: isRTL ? 'rtl' : 'ltr' }]}>
+        <Text style={styles.title}>{t('expense.add_title')}</Text>
+        <Text style={styles.subtitle}>{t('expense.specify_details')}</Text>
 
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
         <View style={styles.inputContainer}>
-          <Text style={styles.label}>Amount *</Text>
+          <Text style={[styles.label, textAlignStyle]}>{t('expense.amount')}</Text>
           <TextInput
-            style={styles.input}
+            style={[styles.input, textAlignStyle]}
             placeholder="0.00"
             value={amount}
             onChangeText={setAmount}
@@ -82,9 +85,9 @@ export default function AddExpenseScreen() {
         </View>
 
         <View style={styles.inputContainer}>
-          <Text style={styles.label}>Currency *</Text>
+          <Text style={[styles.label, textAlignStyle]}>{t('expense.currency')}</Text>
           <TextInput
-            style={styles.input}
+            style={[styles.input, textAlignStyle]}
             placeholder="e.g. USD, EUR"
             value={currency}
             onChangeText={setCurrency}
@@ -94,8 +97,8 @@ export default function AddExpenseScreen() {
         </View>
 
         <View style={styles.inputContainer}>
-          <Text style={styles.label}>Category *</Text>
-          <View style={styles.categoryContainer}>
+          <Text style={[styles.label, textAlignStyle]}>{t('expense.category')}</Text>
+          <View style={[styles.categoryContainer, rowDirectionStyle]}>
             {categories.map((cat) => (
               <TouchableOpacity
                 key={cat}
@@ -104,6 +107,7 @@ export default function AddExpenseScreen() {
                   category === cat && styles.categoryOptionSelected,
                 ]}
                 onPress={() => setCategory(cat)}
+                activeOpacity={0.7}
               >
                 <Text
                   style={[
@@ -119,10 +123,10 @@ export default function AddExpenseScreen() {
         </View>
 
         <View style={styles.inputContainer}>
-          <Text style={styles.label}>Description *</Text>
+          <Text style={[styles.label, textAlignStyle]}>{t('expense.description')}</Text>
           <TextInput
-            style={styles.input}
-            placeholder="e.g. Dinner, Taxi, Museum entry"
+            style={[styles.input, textAlignStyle]}
+            placeholder={t('expense.description_placeholder')}
             value={description}
             onChangeText={setDescription}
             autoCapitalize="sentences"
@@ -137,7 +141,7 @@ export default function AddExpenseScreen() {
           {loading ? (
             <ActivityIndicator color="#ffffff" />
           ) : (
-            <Text style={styles.primaryButtonText}>Save Expense</Text>
+            <Text style={styles.primaryButtonText}>{t('expense.save')}</Text>
           )}
         </TouchableOpacity>
 
@@ -146,7 +150,7 @@ export default function AddExpenseScreen() {
           onPress={() => navigation.goBack()}
           disabled={loading}
         >
-          <Text style={styles.secondaryButtonText}>Cancel</Text>
+          <Text style={styles.secondaryButtonText}>{t('expense.cancel')}</Text>
         </TouchableOpacity>
       </View>
     </ScrollView>
@@ -235,7 +239,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8f9fa',
   },
   categoryContainer: {
-    flexDirection: 'row',
     justifyContent: 'space-between',
     flexWrap: 'wrap',
   },

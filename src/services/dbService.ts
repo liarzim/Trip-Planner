@@ -128,7 +128,8 @@ export const createEvent = async (
   endTime: string,
   latitude?: number,
   longitude?: number,
-  bookingReference?: string
+  bookingReference?: string,
+  description?: string
 ): Promise<Event> => {
   const eventsCollection = collection(db, 'events');
   const data: any = {
@@ -141,6 +142,7 @@ export const createEvent = async (
   if (latitude !== undefined) data.latitude = latitude;
   if (longitude !== undefined) data.longitude = longitude;
   if (bookingReference !== undefined) data.bookingReference = bookingReference;
+  if (description !== undefined) data.description = description;
 
   const docRef = await addDoc(eventsCollection, data);
 
@@ -154,6 +156,7 @@ export const createEvent = async (
     latitude,
     longitude,
     bookingReference,
+    description,
   };
 };
 
@@ -177,6 +180,7 @@ export const getEventsForTrip = async (tripId: string): Promise<Event[]> => {
       latitude: data.latitude,
       longitude: data.longitude,
       bookingReference: data.bookingReference,
+      description: data.description,
     } as Event;
   });
 };

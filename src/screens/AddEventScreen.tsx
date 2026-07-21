@@ -16,6 +16,9 @@ import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { createEvent } from '../services/dbService';
 import { RootStackParamList } from '../navigation/AppNavigator';
+import { useTranslation } from '../services/translationService';
+import MapPicker from '../components/MapPicker';
+import { colors } from '../theme/colors';
 
 type AddEventRouteProp = RouteProp<RootStackParamList, 'AddEvent'>;
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'AddEvent'>;
@@ -25,6 +28,8 @@ export default function AddEventScreen() {
   const navigation = useNavigation<NavigationProp>();
   const { tripId } = route.params;
 
+  const { t, isRTL } = useTranslation();
+
   const [title, setTitle] = useState('');
   const [type, setType] = useState('flight'); // Default type: flight
   const [startTime, setStartTime] = useState('');
@@ -32,12 +37,13 @@ export default function AddEventScreen() {
   const [latitude, setLatitude] = useState('');
   const [longitude, setLongitude] = useState('');
   const [bookingReference, setBookingReference] = useState('');
+  const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   const handleSave = async () => {
     if (!title || !type || !startTime) {
-      setError('Please fill in all required fields (Title, Type, Start Time).');
+      setError(t('event.required_error'));
       return;
     }
 
@@ -45,11 +51,11 @@ export default function AddEventScreen() {
     const lonVal = longitude ? parseFloat(longitude) : undefined;
 
     if (latitude && isNaN(latVal!)) {
-      setError('Latitude must be a valid number.');
+      setError(t('event.lat_error'));
       return;
     }
     if (longitude && isNaN(lonVal!)) {
-      setError('Longitude must be a valid number.');
+      setError(t('event.lon_error'));
       return;
     }
 
@@ -65,7 +71,8 @@ export default function AddEventScreen() {
         endTime, 
         latVal, 
         lonVal, 
-        bookingReference || undefined
+        bookingReference || undefined,
+        description || undefined
       );
       navigation.goBack();
     } catch (err: any) {
@@ -75,11 +82,177 @@ export default function AddEventScreen() {
     }
   };
 
+  const handleLocationSelected = (lat: number, lon: number) => {
+    setLatitude(lat.toString());
+    setLongitude(lon.toString());
+  };
+
   const eventTypes = [
-    { label: '✈️ Flight', value: 'flight' },
-    { label: '🏨 Hotel', value: 'hotel' },
-    { label: '📍 POI', value: 'poi' },
+    { label: `✈️ ${t('event.flight')}`, value: 'flight' },
+    { label: `🏨 ${t('event.hotel')}`, value: 'hotel' },
+    { label: `📍 ${t('event.poi')}`, value: 'poi' },
   ];
+
+  // Dynamic layout alignment rules based on RTL orientation
+  const textAlignStyle = { textAlign: (isRTL ? 'right' : 'left') as 'left' | 'right' };
+  const rowDirectionStyle = { flexDirection: (isRTL ? 'row-reverse' : 'row') as 'row' | 'row-reverse' };
+
+  const formContent = (
+    <ScrollView contentContainerStyle={styles.scrollContainer}>
+      <View style={[styles.card, { direction: isRTL ? 'rtl' : 'ltr' }]}>
+        <Text style={styles.title}>{t('event.add_title')}</Text>
+        <Text style={styles.subtitle}>{t('event.specify_details')}</Text>
+
+        {error ? <Text style={styles.errorText}>{error}</Text> : null}
+
+        <View style={styles.inputContainer}>
+          <Text style={[styles.label, textAlignStyle]}>{t('event.title_label')}</Text>
+          <TextInput
+            style={[styles.input, textAlignStyle]}
+            placeholder={t('event.title_placeholder')}
+            value={title}
+            onChangeText={setTitle}
+            autoCapitalize="sentences"
+          />
+        </View>
+
+        <View style={styles.inputContainer}>
+          <Text style={[styles.label, textAlignStyle]}>{t('event.type_label')}</Text>
+          <View style={[styles.typeSelectorContainer, rowDirectionStyle]}>
+            {eventTypes.map((item) => (
+              <TouchableOpacity
+                key={item.value}
+                style={[
+                  styles.typeOption,
+                  type === item.value && styles.typeOptionSelected,
+                ]}
+                onPress={() => setType(item.value)}
+                activeOpacity={0.7}
+              >
+                <Text
+                  style={[
+                    styles.typeOptionText,
+                    type === item.value && styles.typeOptionTextSelected,
+                  ]}
+                >
+                  {item.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.inputContainer}>
+          <Text style={[styles.label, textAlignStyle]}>{t('event.start_time')}</Text>
+          <TextInput
+            style={[styles.input, textAlignStyle]}
+            placeholder={t('event.start_placeholder')}
+            value={startTime}
+            onChangeText={setStartTime}
+          />
+        </View>
+
+        <View style={styles.inputContainer}>
+          <Text style={[styles.label, textAlignStyle]}>{t('event.end_time')}</Text>
+          <TextInput
+            style={[styles.input, textAlignStyle]}
+            placeholder={t('event.end_placeholder')}
+            value={endTime}
+            onChangeText={setEndTime}
+          />
+        </View>
+
+        <View style={styles.inputContainer}>
+          <Text style={[styles.label, textAlignStyle]}>{t('event.booking_ref')}</Text>
+          <TextInput
+            style={[styles.input, textAlignStyle]}
+            placeholder={t('event.booking_placeholder')}
+            value={bookingReference}
+            onChangeText={setBookingReference}
+            autoCapitalize="characters"
+          />
+        </View>
+
+        <View style={[styles.row, rowDirectionStyle]}>
+          <View style={[styles.inputContainer, { flex: 1, marginRight: isRTL ? 0 : 8, marginLeft: isRTL ? 8 : 0 }]}>
+            <Text style={[styles.label, textAlignStyle]}>{t('event.latitude')}</Text>
+            <TextInput
+              style={[styles.input, textAlignStyle]}
+              placeholder="e.g. 48.8566"
+              value={latitude}
+              onChangeText={setLatitude}
+              keyboardType="numeric"
+            />
+          </View>
+          <View style={[styles.inputContainer, { flex: 1, marginRight: isRTL ? 8 : 0, marginLeft: isRTL ? 0 : 8 }]}>
+            <Text style={[styles.label, textAlignStyle]}>{t('event.longitude')}</Text>
+            <TextInput
+              style={[styles.input, textAlignStyle]}
+              placeholder="e.g. 2.3522"
+              value={longitude}
+              onChangeText={setLongitude}
+              keyboardType="numeric"
+            />
+          </View>
+        </View>
+
+        {/* Interactive Map Picker */}
+        <View style={styles.inputContainer}>
+          <Text style={[styles.label, textAlignStyle]}>{t('event.pin_location')}</Text>
+          <MapPicker
+            latitude={latitude ? parseFloat(latitude) : undefined}
+            longitude={longitude ? parseFloat(longitude) : undefined}
+            onSelectLocation={handleLocationSelected}
+            lang={getLanguage()}
+            isRTL={isRTL}
+            t={t}
+          />
+        </View>
+
+        {/* Multiline Notes Text Box */}
+        <View style={styles.inputContainer}>
+          <Text style={[styles.label, textAlignStyle]}>{t('event.description')}</Text>
+          <TextInput
+            style={[styles.input, styles.multilineInput, textAlignStyle]}
+            placeholder={t('event.description_placeholder')}
+            value={description}
+            onChangeText={setDescription}
+            multiline={true}
+            numberOfLines={4}
+          />
+        </View>
+
+        <TouchableOpacity
+          style={styles.primaryButton}
+          onPress={handleSave}
+          disabled={loading}
+        >
+          {loading ? (
+            <ActivityIndicator color="#ffffff" />
+          ) : (
+            <Text style={styles.primaryButtonText}>{t('event.save')}</Text>
+          )}
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.secondaryButton}
+          onPress={() => navigation.goBack()}
+          disabled={loading}
+        >
+          <Text style={styles.secondaryButtonText}>{t('event.cancel')}</Text>
+        </TouchableOpacity>
+      </View>
+    </ScrollView>
+  );
+
+  // Focus Bug Bypass on Web: return a regular View layout to prevent input click blocking
+  if (Platform.OS === 'web') {
+    return (
+      <View style={styles.container}>
+        {formContent}
+      </View>
+    );
+  }
 
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
@@ -87,127 +260,16 @@ export default function AddEventScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.container}
       >
-        <ScrollView contentContainerStyle={styles.scrollContainer}>
-          <View style={styles.card}>
-            <Text style={styles.title}>Add Itinerary Event</Text>
-            <Text style={styles.subtitle}>Specify the details of your activity</Text>
-
-            {error ? <Text style={styles.errorText}>{error}</Text> : null}
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Event Title *</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="e.g. Flight to Paris, Check-in at Hilton"
-                value={title}
-                onChangeText={setTitle}
-                autoCapitalize="sentences"
-              />
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Event Type *</Text>
-              <View style={styles.typeSelectorContainer}>
-                {eventTypes.map((item) => (
-                  <TouchableOpacity
-                    key={item.value}
-                    style={[
-                      styles.typeOption,
-                      type === item.value && styles.typeOptionSelected,
-                    ]}
-                    onPress={() => setType(item.value)}
-                  >
-                    <Text
-                      style={[
-                        styles.typeOptionText,
-                        type === item.value && styles.typeOptionTextSelected,
-                      ]}
-                    >
-                      {item.label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Start Time *</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="e.g. 08:30 AM, 14:00"
-                value={startTime}
-                onChangeText={setStartTime}
-              />
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>End Time (Optional)</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="e.g. 11:30 AM, 18:00"
-                value={endTime}
-                onChangeText={setEndTime}
-              />
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Booking / Ticket Reference (Optional)</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="e.g. LH123456, BOOKING-ID"
-                value={bookingReference}
-                onChangeText={setBookingReference}
-                autoCapitalize="characters"
-              />
-            </View>
-
-            <View style={styles.row}>
-              <View style={[styles.inputContainer, { flex: 1, marginRight: 8 }]}>
-                <Text style={styles.label}>Latitude (Optional)</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="e.g. 48.8566"
-                  value={latitude}
-                  onChangeText={setLatitude}
-                  keyboardType="numeric"
-                />
-              </View>
-              <View style={[styles.inputContainer, { flex: 1, marginLeft: 8 }]}>
-                <Text style={styles.label}>Longitude (Optional)</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="e.g. 2.3522"
-                  value={longitude}
-                  onChangeText={setLongitude}
-                  keyboardType="numeric"
-                />
-              </View>
-            </View>
-
-            <TouchableOpacity
-              style={styles.primaryButton}
-              onPress={handleSave}
-              disabled={loading}
-            >
-              {loading ? (
-                <ActivityIndicator color="#ffffff" />
-              ) : (
-                <Text style={styles.primaryButtonText}>Save Event</Text>
-              )}
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.secondaryButton}
-              onPress={() => navigation.goBack()}
-              disabled={loading}
-            >
-              <Text style={styles.secondaryButtonText}>Cancel</Text>
-            </TouchableOpacity>
-          </View>
-        </ScrollView>
+        {formContent}
       </KeyboardAvoidingView>
     </TouchableWithoutFeedback>
   );
+}
+
+// Global language utility mapping helper
+function getLanguage() {
+  const { getLanguage } = require('../services/translationService');
+  return getLanguage();
 }
 
 const styles = StyleSheet.create({
@@ -271,6 +333,11 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#212529',
     backgroundColor: '#f8f9fa',
+  },
+  multilineInput: {
+    height: 100,
+    textAlignVertical: 'top',
+    paddingTop: 10,
   },
   typeSelectorContainer: {
     flexDirection: 'row',
