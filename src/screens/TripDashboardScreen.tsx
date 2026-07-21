@@ -259,7 +259,7 @@ export default function TripDashboardScreen() {
           const resultUrl = reader.result as string;
           const base64Data = resultUrl.split(',')[1];
 
-          const parseTripDocumentFn = httpsCallable(functions, 'parseTripDocument');
+          const parseTripDocumentFn = httpsCallable(functions, 'parseTripDocument', { timeout: 180000 });
           const response = await parseTripDocumentFn({ base64Data });
 
           const data = response.data as { success: boolean; events: any[] };
@@ -310,7 +310,7 @@ export default function TripDashboardScreen() {
         encoding: FileSystem.EncodingType.Base64,
       });
 
-      const parseTripDocumentFn = httpsCallable(functions, 'parseTripDocument');
+      const parseTripDocumentFn = httpsCallable(functions, 'parseTripDocument', { timeout: 180000 });
       const response = await parseTripDocumentFn({ base64Data });
 
       const data = response.data as { success: boolean; events: any[] };
