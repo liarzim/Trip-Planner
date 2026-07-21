@@ -974,12 +974,23 @@ export default function TripDashboardScreen() {
         <View style={styles.modalOverlay}>
           <View style={styles.eventModalContainer}>
             <ScrollView contentContainerStyle={{ paddingBottom: 20 }} showsVerticalScrollIndicator={false}>
-              <Text style={[styles.modalTitle, textAlignStyle]}>
-                {isRTL ? 'הוספת אירוע חדש' : 'Add New Event'}
-              </Text>
-              <Text style={[styles.modalSubtitle, textAlignStyle, { marginBottom: 10 }]}>
-                {isRTL ? 'ציין את פרטי האירוע ותאריכו' : 'Specify the event details and date'}
-              </Text>
+              <View style={[styles.modalHeaderRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.modalTitle, textAlignStyle]}>
+                    {isRTL ? 'הוספת אירוע חדש' : 'Add New Event'}
+                  </Text>
+                  <Text style={[styles.modalSubtitle, textAlignStyle, { marginBottom: 0 }]}>
+                    {isRTL ? 'ציין את פרטי האירוע ותאריכו' : 'Specify the event details and date'}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.modalCloseIconBtn}
+                  onPress={() => setIsAddEventModalVisible(false)}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.modalCloseIconText}>✕</Text>
+                </TouchableOpacity>
+              </View>
 
               {eventFormError ? (
                 <Text style={styles.modalFormErrorText}>{eventFormError}</Text>
@@ -1990,6 +2001,27 @@ const styles = StyleSheet.create({
     fontFamily: typography.fontFamily,
     fontSize: 11,
     fontWeight: typography.weights.bold,
+    color: '#495057',
+  },
+  modalHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+    width: '100%',
+  },
+  modalCloseIconBtn: {
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: '#f1f3f5',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 32,
+    height: 32,
+  },
+  modalCloseIconText: {
+    fontSize: 14,
+    fontWeight: 'bold',
     color: '#495057',
   },
 });
