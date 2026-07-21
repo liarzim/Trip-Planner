@@ -29,6 +29,7 @@ import { functions } from '../config/firebaseConfig';
 import { httpsCallable } from 'firebase/functions';
 import { useTranslation } from '../services/translationService';
 import LanguageSelector from '../components/LanguageSelector';
+import DashboardMap from '../components/DashboardMap';
 
 type TripDashboardRouteProp = RouteProp<RootStackParamList, 'TripDashboard'>;
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'TripDashboard'>;
@@ -43,6 +44,7 @@ export default function TripDashboardScreen() {
   const route = useRoute<TripDashboardRouteProp>();
   const navigation = useNavigation<NavigationProp>();
   const { tripId } = route.params;
+  const [showMapOnMobile, setShowMapOnMobile] = useState(false);
 
   const { t, isRTL } = useTranslation();
 
@@ -592,6 +594,69 @@ export default function TripDashboardScreen() {
   const rowDirectionStyle = { flexDirection: (isRTL ? 'row-reverse' : 'row') as 'row' | 'row-reverse' };
   const textAlignStyle = { textAlign: (isRTL ? 'right' : 'left') as 'left' | 'right' };
 
+  const isWeb = Platform.OS === 'web';
+
+  const dashboardContent = (
+    <View style={styles.dashboardContainer}>
+      {/* Total Spent Summary Card - Redesigned as Prominent Hero Card */}
+      <View style={styles.summaryCard}>
+        <Text style={styles.summaryTitle}>{t('dashboard.total_spent')}</Text>
+        <Text style={styles.summaryAmount}>${totalSpent.toFixed(2)} USD</Text>
+        <Text style={styles.summarySubtitle}>
+          {t('dashboard.logged_from', { count: expenses.length.toString() })}
+        </Text>
+      </View>
+
+      <Text style={[styles.sectionTitle, textAlignStyle]}>{t('dashboard.itinerary')}</Text>
+
+      {loading ? (
+        <View style={styles.loaderContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      ) : (
+        <FlatList
+          data={events}
+          keyExtractor={(item) => item.id}
+          renderItem={renderEventItem}
+          contentContainerStyle={styles.listContainer}
+          ListFooterComponent={renderFooter}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>{t('dashboard.no_events')}</Text>
+              <Text style={styles.emptySubText}>{t('dashboard.start_building')}</Text>
+            </View>
+          }
+        />
+      )}
+    </View>
+  );
+
+  if (!isWeb && showMapOnMobile) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={[styles.header, rowDirectionStyle]}>
+          <TouchableOpacity style={styles.backButton} onPress={() => setShowMapOnMobile(false)}>
+            <Text style={styles.backText}>{isRTL ? '← רשימה' : '← List'}</Text>
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>{t('dashboard.title')}</Text>
+          <View style={[rowDirectionStyle, { alignItems: 'center' }]}>
+            <LanguageSelector />
+          </View>
+        </View>
+        <View style={{ flex: 1 }}>
+          <DashboardMap events={events} />
+        </View>
+        <TouchableOpacity 
+          style={styles.mobileMapFab}
+          onPress={() => setShowMapOnMobile(false)}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.fabText}>📋 {isRTL ? 'רשימה' : 'List'}</Text>
+        </TouchableOpacity>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={[styles.header, rowDirectionStyle]}>
@@ -602,19 +667,6 @@ export default function TripDashboardScreen() {
         
         <View style={[rowDirectionStyle, { alignItems: 'center' }]}>
           <LanguageSelector />
-          <TouchableOpacity 
-            style={[
-              styles.mapHeaderButton, 
-              { 
-                marginLeft: isRTL ? 0 : 10, 
-                marginRight: isRTL ? 10 : 0 
-              }
-            ]} 
-            onPress={() => navigation.navigate('TripMap', { tripId })}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.mapHeaderText}>🗺️ {isRTL ? 'מפה' : 'Map'}</Text>
-          </TouchableOpacity>
         </View>
       </View>
 
@@ -627,56 +679,63 @@ export default function TripDashboardScreen() {
         </View>
       )}
 
-      <View style={[styles.content, { direction: isRTL ? 'rtl' : 'ltr' }]}>
-        {/* Total Spent Summary Card - Redesigned as Prominent Hero Card */}
-        <View style={styles.summaryCard}>
-          <Text style={styles.summaryTitle}>{t('dashboard.total_spent')}</Text>
-          <Text style={styles.summaryAmount}>${totalSpent.toFixed(2)} USD</Text>
-          <Text style={styles.summarySubtitle}>
-            {t('dashboard.logged_from', { count: expenses.length.toString() })}
-          </Text>
-        </View>
-
-        <Text style={[styles.sectionTitle, textAlignStyle]}>{t('dashboard.itinerary')}</Text>
-
-        {loading ? (
-          <View style={styles.loaderContainer}>
-            <ActivityIndicator size="large" color={colors.primary} />
+      {isWeb ? (
+        <View style={[styles.webSplitLayout, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+          <View style={styles.webDashboardColumn}>
+            {dashboardContent}
+            <View style={[styles.webButtonRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+              <TouchableOpacity 
+                style={[styles.webActionBtn, styles.eventButton]}
+                onPress={() => navigation.navigate('AddEvent', { tripId })}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.buttonText}>{t('dashboard.add_event')}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.webActionBtn, styles.expenseButton]}
+                onPress={() => navigation.navigate('AddExpense', { tripId })}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.buttonText}>{t('dashboard.add_expense')}</Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        ) : (
-          <FlatList
-            data={events}
-            keyExtractor={(item) => item.id}
-            renderItem={renderEventItem}
-            contentContainerStyle={styles.listContainer}
-            ListFooterComponent={renderFooter}
-            ListEmptyComponent={
-              <View style={styles.emptyContainer}>
-                <Text style={styles.emptyText}>{t('dashboard.no_events')}</Text>
-                <Text style={styles.emptySubText}>{t('dashboard.start_building')}</Text>
-              </View>
-            }
-          />
-        )}
-      </View>
-
-      {/* Floating Action Button Container */}
-      <View style={[styles.buttonRow, rowDirectionStyle]}>
-        <TouchableOpacity 
-          style={[styles.button, styles.eventButton]}
-          onPress={() => navigation.navigate('AddEvent', { tripId })}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.buttonText}>{t('dashboard.add_event')}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={[styles.button, styles.expenseButton]}
-          onPress={() => navigation.navigate('AddExpense', { tripId })}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.buttonText}>{t('dashboard.add_expense')}</Text>
-        </TouchableOpacity>
-      </View>
+          <View style={styles.webMapColumn}>
+            <DashboardMap events={events} />
+          </View>
+        </View>
+      ) : (
+        <View style={{ flex: 1 }}>
+          <View style={[styles.content, { direction: isRTL ? 'rtl' : 'ltr', flex: 1 }]}>
+            {dashboardContent}
+          </View>
+          
+          <View style={[styles.buttonRow, rowDirectionStyle]}>
+            <TouchableOpacity 
+              style={[styles.button, styles.eventButton]}
+              onPress={() => navigation.navigate('AddEvent', { tripId })}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.buttonText}>{t('dashboard.add_event')}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={[styles.button, styles.expenseButton]}
+              onPress={() => navigation.navigate('AddExpense', { tripId })}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.buttonText}>{t('dashboard.add_expense')}</Text>
+            </TouchableOpacity>
+          </View>
+          
+          <TouchableOpacity 
+            style={styles.mobileMapFab}
+            onPress={() => setShowMapOnMobile(true)}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.fabText}>🗺️ {isRTL ? 'מפה' : 'Map'}</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Ticket QR Code Modal */}
       <Modal
@@ -1274,5 +1333,69 @@ const styles = StyleSheet.create({
     fontFamily: typography.fontFamily,
     fontSize: typography.sizes.sm,
     color: colors.textLight,
+  },
+  webSplitLayout: {
+    flex: 1,
+    flexDirection: 'row',
+    width: '100%',
+    height: '100%',
+    overflow: 'hidden',
+  },
+  webDashboardColumn: {
+    width: '40%',
+    minWidth: 420,
+    maxWidth: 500,
+    borderRightWidth: 1,
+    borderRightColor: colors.border,
+    height: '100%',
+    backgroundColor: colors.white,
+  },
+  webMapColumn: {
+    flex: 1,
+    height: '100%',
+    padding: 16,
+    backgroundColor: '#f1f3f5',
+  },
+  dashboardContainer: {
+    flex: 1,
+    paddingHorizontal: 16,
+  },
+  webButtonRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    padding: 16,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    backgroundColor: colors.white,
+  },
+  webActionBtn: {
+    flex: 1,
+    marginHorizontal: 6,
+    height: 48,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  mobileMapFab: {
+    position: 'absolute',
+    right: 20,
+    bottom: 90,
+    backgroundColor: colors.primary,
+    borderRadius: 28,
+    width: 96,
+    height: 56,
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4.65,
+    zIndex: 9999,
+  },
+  fabText: {
+    color: colors.white,
+    fontWeight: typography.weights.bold,
+    fontSize: typography.sizes.md,
   },
 });
