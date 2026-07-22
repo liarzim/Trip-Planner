@@ -34,6 +34,7 @@ export default function TripSettingsScreen() {
   const [saving, setSaving] = useState(false);
   const [baseCurrency, setBaseCurrency] = useState('USD');
   const [exchangeRate, setExchangeRate] = useState('3.70');
+  const [timeFormat, setTimeFormat] = useState<'24h' | '12h'>('24h');
   const [tripName, setTripName] = useState('');
 
   useEffect(() => {
@@ -44,6 +45,7 @@ export default function TripSettingsScreen() {
           setTripName(trip.name);
           if (trip.baseCurrency) setBaseCurrency(trip.baseCurrency);
           if (trip.exchangeRateToILS) setExchangeRate(trip.exchangeRateToILS.toString());
+          if (trip.timeFormat) setTimeFormat(trip.timeFormat);
         }
       } catch (err) {
         console.error('Failed to load trip settings:', err);
@@ -70,7 +72,7 @@ export default function TripSettingsScreen() {
 
     try {
       setSaving(true);
-      await updateTripSettings(tripId, baseCurrency, parsedRate);
+      await updateTripSettings(tripId, baseCurrency, parsedRate, timeFormat);
       
       const successMsg = isRTL 
         ? 'ההגדרות נשמרו בהצלחה!' 
@@ -112,12 +114,12 @@ export default function TripSettingsScreen() {
       <View style={styles.container}>
         <View style={styles.card}>
           <Text style={[styles.title, textAlignStyle]}>
-            {isRTL ? `הגדרות תקציב עבור ${tripName}` : `Budget Settings for ${tripName}`}
+            {isRTL ? `הגדרות טיול עבור ${tripName}` : `Trip Settings for ${tripName}`}
           </Text>
           <Text style={[styles.subtitle, textAlignStyle]}>
             {isRTL 
-              ? 'הגדר את מטבע הבסיס של הטיול ואת שער ההמרה לשקלים (ILS)' 
-              : 'Define the trip base currency and the conversion rate to ILS'}
+              ? 'הגדר את מטבע הבסיס, שער ההמרה ופורמט הצגת השעה' 
+              : 'Define trip base currency, conversion rate, and time display format'}
           </Text>
 
           {/* Currency Selection Grid */}
@@ -162,12 +164,56 @@ export default function TripSettingsScreen() {
             placeholderTextColor="#adb5bd"
           />
 
+          {/* Time Format Selector */}
+          <Text style={[styles.label, textAlignStyle, { marginTop: 14 }]}>
+            ⏱️ {isRTL ? 'פורמט הצגת שעה *' : 'Display Time Format *'}
+          </Text>
+          <View style={[styles.currencyRow, rowDirectionStyle]}>
+            <TouchableOpacity
+              style={[
+                styles.currencyChip,
+                { flex: 1, alignItems: 'center' },
+                timeFormat === '24h' && styles.currencyChipSelected
+              ]}
+              onPress={() => setTimeFormat('24h')}
+              activeOpacity={0.7}
+            >
+              <Text
+                style={[
+                  styles.currencyChipText,
+                  timeFormat === '24h' && styles.currencyChipTextSelected
+                ]}
+              >
+                24-Hour (14:30)
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.currencyChip,
+                { flex: 1, alignItems: 'center' },
+                timeFormat === '12h' && styles.currencyChipSelected
+              ]}
+              onPress={() => setTimeFormat('12h')}
+              activeOpacity={0.7}
+            >
+              <Text
+                style={[
+                  styles.currencyChipText,
+                  timeFormat === '12h' && styles.currencyChipTextSelected
+                ]}
+              >
+                12-Hour (02:30 PM)
+              </Text>
+            </TouchableOpacity>
+          </View>
+
           {/* Static Preview Info Card */}
           <View style={[styles.previewCard, rowDirectionStyle]}>
             <Text style={styles.previewText}>
               💡 {isRTL 
-                ? `המרה מחושבת: 100 ${baseCurrency} = ₪${(100 * (parseFloat(exchangeRate) || 0)).toFixed(2)}`
-                : `Calculated Conversion: 100 ${baseCurrency} = ₪${(100 * (parseFloat(exchangeRate) || 0)).toFixed(2)}`}
+                ? `תצוגה מקדימה: 100 ${baseCurrency} = ₪${(100 * (parseFloat(exchangeRate) || 0)).toFixed(2)} | פורמט: ${timeFormat}`
+                : `Preview: 100 ${baseCurrency} = ₪${(100 * (parseFloat(exchangeRate) || 0)).toFixed(2)} | Format: ${timeFormat}`}
             </Text>
           </View>
 

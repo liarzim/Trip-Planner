@@ -22,7 +22,7 @@ import QRCode from 'react-native-qrcode-svg';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system/legacy';
 import { RootStackParamList } from '../navigation/AppNavigator';
-import { getEventsForTrip, getExpensesForTrip, getDocumentsForTrip, saveDocument, getTrip, createEvent, updateEvent, deleteEvent } from '../services/dbService';
+import { getEventsForTrip, getExpensesForTrip, getDocumentsForTrip, saveDocument, getTrip, createEvent, updateEvent, deleteEvent, updateTripSettings } from '../services/dbService';
 import { uploadTripDocument } from '../services/storageService';
 import { geocodeAddress } from '../services/geocodingService';
 import { fetchRouteDirections } from '../services/directionsService';
@@ -39,6 +39,7 @@ import { useTranslation } from '../services/translationService';
 import LanguageSelector from '../components/LanguageSelector';
 import DashboardMap from '../components/DashboardMap';
 import PackingList from '../components/PackingList';
+import { formatTimeByPreference } from '../utils/timeFormatter';
 
 type TripDashboardRouteProp = RouteProp<RootStackParamList, 'TripDashboard'>;
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'TripDashboard'>;
@@ -87,6 +88,7 @@ export default function TripDashboardScreen() {
   // Trip budget settings states
   const [tripBaseCurrency, setTripBaseCurrency] = useState('USD');
   const [tripExchangeRate, setTripExchangeRate] = useState<number | null>(null);
+  const [tripTimeFormat, setTripTimeFormat] = useState<'24h' | '12h'>('24h');
 
   // Add Event Modal Form State
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
@@ -262,6 +264,9 @@ export default function TripDashboardScreen() {
               setTripName(fetchedTrip.name || '');
               setTripStartDate(fetchedTrip.startDate || '');
               setTripEndDate(fetchedTrip.endDate || '');
+              if (fetchedTrip.timeFormat) {
+                setTripTimeFormat(fetchedTrip.timeFormat);
+              }
               if (fetchedTrip.baseCurrency) {
                 setTripBaseCurrency(fetchedTrip.baseCurrency);
               }
@@ -968,7 +973,7 @@ export default function TripDashboardScreen() {
 
               <View style={[styles.webFlightTimeline, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
                 <View style={styles.webFlightTimePoint}>
-                  <Text style={styles.webFlightTime}>{item.departureTime || item.startTime.split(' ')[1] || item.startTime}</Text>
+                  <Text style={styles.webFlightTime}>{formatTimeByPreference(item.departureTime || item.startTime.split(' ')[1] || item.startTime, tripTimeFormat)}</Text>
                   <Text style={styles.webFlightAirport}>{item.originAirport || 'TLV'}</Text>
                 </View>
                 <View style={styles.webFlightConnector}>
@@ -979,7 +984,7 @@ export default function TripDashboardScreen() {
                   <View style={styles.webFlightDot} />
                 </View>
                 <View style={styles.webFlightTimePoint}>
-                  <Text style={styles.webFlightTime}>{item.arrivalTime || item.endTime.split(' ')[1] || item.endTime}</Text>
+                  <Text style={styles.webFlightTime}>{formatTimeByPreference(item.arrivalTime || item.endTime.split(' ')[1] || item.endTime, tripTimeFormat)}</Text>
                   <Text style={styles.webFlightAirport}>{item.destinationAirport || 'LHR'}</Text>
                 </View>
               </View>
@@ -1005,7 +1010,7 @@ export default function TripDashboardScreen() {
             <View style={styles.mobileFlightRow}>
               <View style={[styles.mobileFlightHeaderRow, rowDirectionStyle]}>
                 <Text style={styles.mobileFlightTimeLarge}>
-                  {item.departureTime || item.startTime.split(' ')[1] || item.startTime}
+                  {formatTimeByPreference(item.departureTime || item.startTime.split(' ')[1] || item.startTime, tripTimeFormat)}
                 </Text>
                 <View style={[styles.badge, { backgroundColor: badge.bg, alignSelf: 'center', marginRight: isRTL ? 0 : 6, marginLeft: isRTL ? 6 : 0 }]}>
                   <Text style={[styles.badgeText, { color: badge.text }]}>✈️ FLIGHT</Text>
@@ -1070,7 +1075,7 @@ export default function TripDashboardScreen() {
                     </Text>
                   ) : null}
                   <Text style={[styles.webHotelDetailText, textAlignStyle]}>
-                    ⏰  {isRTL ? 'צ\'ק-אין' : 'Check-In'}: {item.checkInTime || '15:00'}  •  {isRTL ? 'צ\'ק-אאוט' : 'Check-Out'}: {item.checkOutTime || '11:00'}
+                    ⏰  {isRTL ? 'צ\'ק-אין' : 'Check-In'}: {formatTimeByPreference(item.checkInTime || '15:00', tripTimeFormat)}  •  {isRTL ? 'צ\'ק-אאוט' : 'Check-Out'}: {formatTimeByPreference(item.checkOutTime || '11:00', tripTimeFormat)}
                   </Text>
                   {item.hotelUrl ? (
                     <TouchableOpacity onPress={() => Linking.openURL(item.hotelUrl!)}>
@@ -1111,7 +1116,7 @@ export default function TripDashboardScreen() {
               </View>
               
               <Text style={[styles.mobileHotelCheckInText, textAlignStyle]}>
-                🔑 {isRTL ? `צ'ק-אין: ${item.startTime}` : `Check-in: ${item.startTime}`}
+                🔑 {isRTL ? `צ'ק-אין: ${formatTimeByPreference(item.startTime, tripTimeFormat)}` : `Check-in: ${formatTimeByPreference(item.startTime, tripTimeFormat)}`}
               </Text>
 
               {hasCoordinates && (
@@ -1146,7 +1151,7 @@ export default function TripDashboardScreen() {
             </View>
 
             <Text style={[styles.eventTime, textAlignStyle]}>
-              ⏰  {item.startTime} {item.endTime ? (isRTL ? `עד ${item.endTime}` : `to ${item.endTime}`) : ''}
+              ⏰  {formatTimeByPreference(item.startTime, tripTimeFormat)} {item.endTime ? (isRTL ? `עד ${formatTimeByPreference(item.endTime, tripTimeFormat)}` : `to ${formatTimeByPreference(item.endTime, tripTimeFormat)}`) : ''}
             </Text>
 
             {item.transportMode && item.distance && item.estimatedTravelTime ? (
@@ -1207,7 +1212,7 @@ export default function TripDashboardScreen() {
             </View>
             
             <Text style={[styles.eventTime, textAlignStyle]}>
-              ⏰  {item.startTime} {item.endTime ? (isRTL ? `עד ${item.endTime}` : `to ${item.endTime}`) : ''}
+              ⏰  {formatTimeByPreference(item.startTime, tripTimeFormat)} {item.endTime ? (isRTL ? `עד ${formatTimeByPreference(item.endTime, tripTimeFormat)}` : `to ${formatTimeByPreference(item.endTime, tripTimeFormat)}`) : ''}
             </Text>
 
             {typeof item.cost === 'number' && (
@@ -1500,6 +1505,31 @@ export default function TripDashboardScreen() {
           <Text style={styles.headerTitle}>{t('dashboard.title')}</Text>
           <View style={[rowDirectionStyle, { alignItems: 'center' }]}>
             <TouchableOpacity 
+              style={[
+                styles.settingsButton, 
+                { 
+                  marginRight: isRTL ? 0 : 6, 
+                  marginLeft: isRTL ? 6 : 0, 
+                  backgroundColor: '#e7f5ff',
+                  borderColor: '#74c0fc',
+                  borderWidth: 1,
+                  paddingHorizontal: 8,
+                  width: 'auto'
+                }
+              ]} 
+              onPress={() => {
+                const nextFmt = tripTimeFormat === '24h' ? '12h' : '24h';
+                setTripTimeFormat(nextFmt);
+                updateTripSettings(tripId, tripBaseCurrency, tripExchangeRate || 1.0, nextFmt).catch(console.error);
+              }}
+              activeOpacity={0.7}
+            >
+              <Text style={[styles.settingsButtonText, { fontSize: 12, fontWeight: 'bold', color: colors.primary }]}>
+                ⏱️ {tripTimeFormat.toUpperCase()}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
               style={[styles.settingsButton, { marginRight: isRTL ? 0 : 10, marginLeft: isRTL ? 10 : 0 }]} 
               onPress={() => navigation.navigate('TripSettings', { tripId })}
               activeOpacity={0.7}
@@ -1547,6 +1577,31 @@ export default function TripDashboardScreen() {
         <Text style={styles.headerTitle}>{t('dashboard.title')}</Text>
         
         <View style={[rowDirectionStyle, { alignItems: 'center' }]}>
+          <TouchableOpacity 
+            style={[
+              styles.settingsButton, 
+              { 
+                marginRight: isRTL ? 0 : 6, 
+                marginLeft: isRTL ? 6 : 0, 
+                backgroundColor: '#e7f5ff',
+                borderColor: '#74c0fc',
+                borderWidth: 1,
+                paddingHorizontal: 8,
+                width: 'auto'
+              }
+            ]} 
+            onPress={() => {
+              const nextFmt = tripTimeFormat === '24h' ? '12h' : '24h';
+              setTripTimeFormat(nextFmt);
+              updateTripSettings(tripId, tripBaseCurrency, tripExchangeRate || 1.0, nextFmt).catch(console.error);
+            }}
+            activeOpacity={0.7}
+          >
+            <Text style={[styles.settingsButtonText, { fontSize: 12, fontWeight: 'bold', color: colors.primary }]}>
+              ⏱️ {tripTimeFormat.toUpperCase()}
+            </Text>
+          </TouchableOpacity>
+
           <TouchableOpacity 
             style={[styles.settingsButton, { marginRight: isRTL ? 0 : 10, marginLeft: isRTL ? 10 : 0 }]} 
             onPress={() => navigation.navigate('TripSettings', { tripId })}

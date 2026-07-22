@@ -19,6 +19,7 @@ export interface Trip {
   status: string;
   baseCurrency?: string;
   exchangeRateToILS?: number;
+  timeFormat?: '24h' | '12h';
 }
 
 export interface Expense {
