@@ -10,6 +10,12 @@ export interface Group {
   createdBy: string; // User ID
 }
 
+export interface CurrencyRowItem {
+  code: string;
+  symbol: string;
+  rateToILS: number;
+}
+
 export interface Trip {
   id: string;
   groupId: string;
@@ -20,6 +26,7 @@ export interface Trip {
   baseCurrency?: string;
   exchangeRateToILS?: number;
   timeFormat?: '24h' | '12h';
+  currenciesTable?: CurrencyRowItem[];
 }
 
 export interface Expense {

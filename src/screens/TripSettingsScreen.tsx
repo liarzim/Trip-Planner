@@ -8,7 +8,8 @@ import {
   ActivityIndicator,
   Alert,
   Platform,
-  SafeAreaView
+  SafeAreaView,
+  ScrollView
 } from 'react-native';
 import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -17,12 +18,11 @@ import { getTrip, updateTripSettings } from '../services/dbService';
 import { useTranslation } from '../services/translationService';
 import { colors } from '../theme/colors';
 import { typography } from '../theme/typography';
-import { SUPPORTED_CURRENCIES, formatCurrencyLabel, getCurrencySymbol } from '../utils/currencyRegistry';
+import { SUPPORTED_CURRENCIES, CurrencyInfo } from '../utils/currencyRegistry';
+import { CurrencyRowItem } from '../types';
 
 type TripSettingsRouteProp = RouteProp<RootStackParamList, 'TripSettings'>;
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'TripSettings'>;
-
-const POPULAR_CURRENCIES = ['USD', 'EUR', 'GBP', 'CAD', 'AUD', 'ILS', 'JPY', 'CHF', 'CNY', 'NZD', 'THB', 'INR', 'AED', 'CUSTOM'];
 
 export default function TripSettingsScreen() {
   const route = useRoute<TripSettingsRouteProp>();
@@ -33,12 +33,25 @@ export default function TripSettingsScreen() {
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [baseCurrency, setBaseCurrency] = useState('USD');
-  const [customCurrency, setCustomCurrency] = useState('');
-  const [isCustomMode, setIsCustomMode] = useState(false);
-  const [exchangeRate, setExchangeRate] = useState('3.70');
-  const [timeFormat, setTimeFormat] = useState<'24h' | '12h'>('24h');
   const [tripName, setTripName] = useState('');
+  const [timeFormat, setTimeFormat] = useState<'24h' | '12h'>('24h');
+
+  // Currency Table state
+  const [currenciesList, setCurrenciesList] = useState<CurrencyRowItem[]>(SUPPORTED_CURRENCIES);
+  const [selectedCurrencyCode, setSelectedCurrencyCode] = useState('USD');
+  const [exchangeRate, setExchangeRate] = useState('3.70');
+
+  // Editing state for table row
+  const [editingIndex, setEditingIndex] = useState<number | null>(null);
+  const [editCode, setEditCode] = useState('');
+  const [editSymbol, setEditSymbol] = useState('');
+  const [editRate, setEditRate] = useState('');
+
+  // Add new currency row state
+  const [isAddingRow, setIsAddingRow] = useState(false);
+  const [newCode, setNewCode] = useState('');
+  const [newSymbol, setNewSymbol] = useState('');
+  const [newRate, setNewRate] = useState('');
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -46,18 +59,20 @@ export default function TripSettingsScreen() {
         const trip = await getTrip(tripId);
         if (trip) {
           setTripName(trip.name);
-          if (trip.baseCurrency) {
-            if (POPULAR_CURRENCIES.includes(trip.baseCurrency) && trip.baseCurrency !== 'CUSTOM') {
-              setBaseCurrency(trip.baseCurrency);
-              setIsCustomMode(false);
-            } else {
-              setBaseCurrency('CUSTOM');
-              setCustomCurrency(trip.baseCurrency);
-              setIsCustomMode(true);
-            }
+          if (trip.currenciesTable && Array.isArray(trip.currenciesTable) && trip.currenciesTable.length > 0) {
+            setCurrenciesList(trip.currenciesTable);
+          } else {
+            setCurrenciesList(SUPPORTED_CURRENCIES);
           }
-          if (trip.exchangeRateToILS) setExchangeRate(trip.exchangeRateToILS.toString());
-          if (trip.timeFormat) setTimeFormat(trip.timeFormat);
+          if (trip.baseCurrency) {
+            setSelectedCurrencyCode(trip.baseCurrency);
+          }
+          if (trip.exchangeRateToILS) {
+            setExchangeRate(trip.exchangeRateToILS.toString());
+          }
+          if (trip.timeFormat) {
+            setTimeFormat(trip.timeFormat);
+          }
         }
       } catch (err) {
         console.error('Failed to load trip settings:', err);
@@ -68,52 +83,110 @@ export default function TripSettingsScreen() {
     fetchSettings();
   }, [tripId]);
 
-  const handleSave = async () => {
-    const finalCurrency = isCustomMode ? customCurrency.trim().toUpperCase() : baseCurrency;
-    if (!finalCurrency) {
-      const errorMsg = isRTL 
-        ? 'אנא הזן קוד מטבע תקין' 
-        : 'Please enter a valid currency code';
-      if (Platform.OS === 'web') alert(errorMsg); else Alert.alert('Error', errorMsg);
+  const handleSelectCurrency = (item: CurrencyRowItem) => {
+    setSelectedCurrencyCode(item.code);
+    setExchangeRate(item.rateToILS.toString());
+  };
+
+  const handleStartEditRow = (index: number) => {
+    const item = currenciesList[index];
+    setEditingIndex(index);
+    setEditCode(item.code);
+    setEditSymbol(item.symbol);
+    setEditRate(item.rateToILS.toString());
+  };
+
+  const handleSaveEditRow = () => {
+    if (editingIndex === null) return;
+    const parsedRate = parseFloat(editRate);
+    if (isNaN(parsedRate) || !isFinite(parsedRate) || parsedRate <= 0) {
+      const msg = isRTL ? 'אנא הזן שער חליפין תקין' : 'Please enter a valid numeric rate';
+      if (Platform.OS === 'web') alert(msg); else Alert.alert('Error', msg);
+      return;
+    }
+    const code = editCode.trim().toUpperCase() || 'CURR';
+    const symbol = editSymbol.trim() || '$';
+    
+    const updated = [...currenciesList];
+    const oldCode = updated[editingIndex].code;
+    updated[editingIndex] = {
+      code,
+      symbol,
+      rateToILS: parsedRate
+    };
+    setCurrenciesList(updated);
+
+    if (selectedCurrencyCode === oldCode) {
+      setSelectedCurrencyCode(code);
+      setExchangeRate(parsedRate.toString());
+    }
+    setEditingIndex(null);
+  };
+
+  const handleDeleteRow = (index: number) => {
+    if (currenciesList.length <= 1) {
+      const msg = isRTL ? 'לא ניתן למחוק את המטבע האחרון' : 'Cannot delete the last remaining currency';
+      if (Platform.OS === 'web') alert(msg); else Alert.alert('Error', msg);
+      return;
+    }
+    const deletedItem = currenciesList[index];
+    const updated = currenciesList.filter((_, i) => i !== index);
+    setCurrenciesList(updated);
+
+    if (selectedCurrencyCode === deletedItem.code) {
+      setSelectedCurrencyCode(updated[0].code);
+      setExchangeRate(updated[0].rateToILS.toString());
+    }
+  };
+
+  const handleAddRow = () => {
+    const code = newCode.trim().toUpperCase();
+    const symbol = newSymbol.trim() || '$';
+    const parsedRate = parseFloat(newRate);
+    if (!code || isNaN(parsedRate) || !isFinite(parsedRate) || parsedRate <= 0) {
+      const msg = isRTL ? 'אנא הזן קוד מטבע ושער תקין' : 'Please enter valid currency code and numeric rate';
+      if (Platform.OS === 'web') alert(msg); else Alert.alert('Error', msg);
       return;
     }
 
-    const parsedRate = parseFloat(exchangeRate);
+    const updated = [...currenciesList, { code, symbol, rateToILS: parsedRate }];
+    setCurrenciesList(updated);
+    setSelectedCurrencyCode(code);
+    setExchangeRate(parsedRate.toString());
+
+    setNewCode('');
+    setNewSymbol('');
+    setNewRate('');
+    setIsAddingRow(false);
+  };
+
+  const handleSaveSettings = async () => {
+    const selectedItem = currenciesList.find(c => c.code === selectedCurrencyCode) || currenciesList[0];
+    const parsedRate = parseFloat(exchangeRate) || selectedItem.rateToILS;
+
     if (isNaN(parsedRate) || !isFinite(parsedRate) || parsedRate <= 0) {
       const errorMsg = isRTL 
         ? 'אנא הזן שער חליפין תקין (מספר חיובי גדול מ-0)' 
-        : 'Please enter a valid numeric exchange rate (positive number greater than 0)';
-      if (Platform.OS === 'web') {
-        alert(errorMsg);
-      } else {
-        Alert.alert('Error', errorMsg);
-      }
+        : 'Please enter a valid numeric exchange rate';
+      if (Platform.OS === 'web') alert(errorMsg); else Alert.alert('Error', errorMsg);
       return;
     }
 
     try {
       setSaving(true);
-      await updateTripSettings(tripId, finalCurrency, parsedRate, timeFormat);
+      await updateTripSettings(tripId, selectedItem.code, parsedRate, timeFormat, currenciesList);
       
       const successMsg = isRTL 
         ? 'ההגדרות נשמרו בהצלחה!' 
         : 'Settings saved successfully!';
-      if (Platform.OS === 'web') {
-        alert(successMsg);
-      } else {
-        Alert.alert('Success', successMsg);
-      }
+      if (Platform.OS === 'web') alert(successMsg); else Alert.alert('Success', successMsg);
       navigation.goBack();
     } catch (err) {
       console.error('Failed to save settings:', err);
       const errorMsg = isRTL 
         ? 'שגיאה בשמירת ההגדרות.' 
         : 'Failed to save settings.';
-      if (Platform.OS === 'web') {
-        alert(errorMsg);
-      } else {
-        Alert.alert('Error', errorMsg);
-      }
+      if (Platform.OS === 'web') alert(errorMsg); else Alert.alert('Error', errorMsg);
     } finally {
       setSaving(false);
     }
@@ -130,102 +203,91 @@ export default function TripSettingsScreen() {
     );
   }
 
-  const activeDisplayCurrency = isCustomMode ? (customCurrency.toUpperCase() || 'CURR') : baseCurrency;
+  const selectedItem = currenciesList.find(c => c.code === selectedCurrencyCode) || { code: 'USD', symbol: '$', rateToILS: 3.70 };
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <View style={styles.container}>
+      <ScrollView contentContainerStyle={styles.container}>
         <View style={styles.card}>
           <Text style={[styles.title, textAlignStyle]}>
             {isRTL ? `הגדרות טיול עבור ${tripName}` : `Trip Settings for ${tripName}`}
           </Text>
           <Text style={[styles.subtitle, textAlignStyle]}>
             {isRTL 
-              ? 'הגדר את מטבע הבסיס, שער ההמרה ופורמט הצגת השעה' 
-              : 'Define trip base currency, conversion rate, and time display format'}
+              ? 'נהל את טבלת המטבעות, בחר מטבע בסיס, ערוך שערי המרה ופורמט הצגת השעה' 
+              : 'Manage currency table, select base currency, edit rates, and set time format'}
           </Text>
 
-          {/* Currency Selection Grid */}
-          <Text style={[styles.label, textAlignStyle]}>
-            {isRTL ? 'מטבע בסיס *' : 'Base Currency *'}
-          </Text>
-          <View style={[styles.currencyRow, rowDirectionStyle, { flexWrap: 'wrap' }]}>
-            {POPULAR_CURRENCIES.map((curr) => {
-              const isSelected = isCustomMode ? curr === 'CUSTOM' : baseCurrency === curr;
-              const displayLabel = curr === 'CUSTOM'
-                ? (isRTL ? '➕ אחר (מותאם אישית)' : '➕ Custom Currency')
-                : formatCurrencyLabel(curr);
-              return (
-                <TouchableOpacity
-                  key={curr}
-                  style={[
-                    styles.currencyChip,
-                    isSelected && styles.currencyChipSelected
-                  ]}
-                  onPress={() => {
-                    if (curr === 'CUSTOM') {
-                      setBaseCurrency('CUSTOM');
-                      setIsCustomMode(true);
-                    } else {
-                      setBaseCurrency(curr);
-                      setIsCustomMode(false);
-                      const found = SUPPORTED_CURRENCIES.find(c => c.code === curr);
-                      if (found) setExchangeRate(found.defaultRateToILS.toString());
-                    }
-                  }}
-                  activeOpacity={0.7}
-                >
-                  <Text
-                    style={[
-                      styles.currencyChipText,
-                      isSelected && styles.currencyChipTextSelected
-                    ]}
-                  >
-                    {displayLabel}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
+          {/* Currency Reference & Management Table */}
+          <View style={[styles.sectionHeaderRow, rowDirectionStyle]}>
+            <Text style={[styles.sectionTitleText, textAlignStyle]}>
+              📊 {isRTL ? 'טבלת מטבעות ושערי המרה (לחץ לבחירת מטבע בסיס)' : 'Currency Rates Table (Tap row to set Base Currency)'}
+            </Text>
+            <TouchableOpacity 
+              style={styles.addRowTriggerBtn}
+              onPress={() => setIsAddingRow(true)}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.addRowTriggerBtnText}>
+                ➕ {isRTL ? 'הוסף מטבע' : 'Add Currency'}
+              </Text>
+            </TouchableOpacity>
           </View>
 
-          {/* Custom Currency Text Input if CUSTOM selected */}
-          {isCustomMode && (
-            <View style={{ marginBottom: 12 }}>
-              <Text style={[styles.label, textAlignStyle]}>
-                {isRTL ? 'הזן קוד/סמל מטבע מותאם אישית (למשל: SGD, HUF, CZK, ₪) *' : 'Enter Custom Currency Code (e.g. SGD, HUF, CZK, ₪) *'}
+          {/* Form to add a new currency row */}
+          {isAddingRow && (
+            <View style={styles.addRowFormCard}>
+              <Text style={[styles.addRowFormTitle, textAlignStyle]}>
+                ➕ {isRTL ? 'הוספת מטבע חדש לטבלה' : 'Add New Currency to Table'}
               </Text>
-              <TextInput
-                style={[styles.input, textAlignStyle, { backgroundColor: '#fff' }]}
-                value={customCurrency}
-                onChangeText={setCustomCurrency}
-                placeholder="e.g. SGD, HUF, CZK, ₪"
-                placeholderTextColor="#adb5bd"
-                autoCapitalize="characters"
-              />
+              <View style={[styles.formRow, rowDirectionStyle]}>
+                <View style={[styles.formCol, { flex: 1 }]}>
+                  <Text style={styles.inputLabel}>{isRTL ? 'קוד' : 'Code'}</Text>
+                  <TextInput
+                    style={styles.tableInput}
+                    placeholder="e.g. THB"
+                    value={newCode}
+                    onChangeText={setNewCode}
+                    autoCapitalize="characters"
+                  />
+                </View>
+                <View style={[styles.formCol, { flex: 1 }]}>
+                  <Text style={styles.inputLabel}>{isRTL ? 'סמל' : 'Symbol'}</Text>
+                  <TextInput
+                    style={styles.tableInput}
+                    placeholder="e.g. ฿"
+                    value={newSymbol}
+                    onChangeText={setNewSymbol}
+                  />
+                </View>
+                <View style={[styles.formCol, { flex: 2 }]}>
+                  <Text style={styles.inputLabel}>{isRTL ? 'שער לשקל (₪)' : 'Rate to ILS (₪)'}</Text>
+                  <TextInput
+                    style={styles.tableInput}
+                    placeholder="e.g. 0.10"
+                    value={newRate}
+                    onChangeText={setNewRate}
+                    keyboardType="decimal-pad"
+                  />
+                </View>
+              </View>
+              <View style={[styles.formActionsRow, rowDirectionStyle]}>
+                <TouchableOpacity style={styles.saveRowBtn} onPress={handleAddRow}>
+                  <Text style={styles.saveRowBtnText}>✔️ {isRTL ? 'אישור הוספה' : 'Confirm Add'}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.cancelRowBtn} onPress={() => setIsAddingRow(false)}>
+                  <Text style={styles.cancelRowBtnText}>{isRTL ? 'ביטול' : 'Cancel'}</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           )}
 
-          {/* Exchange Rate Input */}
-          <Text style={[styles.label, textAlignStyle]}>
-            {isRTL 
-              ? `שער המרה מ-${formatCurrencyLabel(activeDisplayCurrency)} לשקל (ILS) *` 
-              : `Exchange Rate from ${formatCurrencyLabel(activeDisplayCurrency)} to ILS *`}
-          </Text>
-          <TextInput
-            style={[styles.input, textAlignStyle]}
-            value={exchangeRate}
-            onChangeText={setExchangeRate}
-            keyboardType="decimal-pad"
-            placeholder="e.g. 4.05"
-            placeholderTextColor="#adb5bd"
-          />
-
-          {/* Currency Reference & Exchange Rates Table */}
-          <Text style={[styles.label, textAlignStyle, { marginTop: 10, fontSize: 13, color: colors.primary }]}>
-            📊 {isRTL ? 'טבלת מטבעות ושערי המרה (לחץ לבחירה)' : 'Currency Rates Reference Table (Tap to select)'}
-          </Text>
+          {/* Main Currency Table */}
           <View style={styles.currencyTableContainer}>
             <View style={[styles.currencyTableHeader, rowDirectionStyle]}>
+              <Text style={[styles.currencyTableCell, styles.currencyTableHeaderText, { width: 40, textAlign: 'center' }]}>
+                ✓
+              </Text>
               <Text style={[styles.currencyTableCell, styles.currencyTableHeaderText, textAlignStyle, { flex: 2 }]}>
                 {isRTL ? 'מטבע (שם)' : 'Currency (Code)'}
               </Text>
@@ -235,42 +297,104 @@ export default function TripSettingsScreen() {
               <Text style={[styles.currencyTableCell, styles.currencyTableHeaderText, textAlignStyle, { flex: 2 }]}>
                 {isRTL ? 'שער לשקל (ILS)' : 'Rate to ILS (₪)'}
               </Text>
+              <Text style={[styles.currencyTableCell, styles.currencyTableHeaderText, { width: 80, textAlign: 'center' }]}>
+                {isRTL ? 'פעולות' : 'Actions'}
+              </Text>
             </View>
-            <View style={{ maxHeight: 150, overflow: 'auto' as any }}>
-              {SUPPORTED_CURRENCIES.map((c) => {
-                const isRowSelected = !isCustomMode && baseCurrency === c.code;
+
+            <ScrollView style={{ maxHeight: 240 }}>
+              {currenciesList.map((item, index) => {
+                const isSelected = selectedCurrencyCode === item.code;
+                const isEditing = editingIndex === index;
+
+                if (isEditing) {
+                  return (
+                    <View key={index} style={[styles.currencyTableEditRow, rowDirectionStyle]}>
+                      <TextInput
+                        style={[styles.tableInput, { flex: 1.5, marginRight: 4 }]}
+                        value={editCode}
+                        onChangeText={setEditCode}
+                        autoCapitalize="characters"
+                      />
+                      <TextInput
+                        style={[styles.tableInput, { width: 45, marginRight: 4, textAlign: 'center' }]}
+                        value={editSymbol}
+                        onChangeText={setEditSymbol}
+                      />
+                      <TextInput
+                        style={[styles.tableInput, { flex: 2, marginRight: 4 }]}
+                        value={editRate}
+                        onChangeText={setEditRate}
+                        keyboardType="decimal-pad"
+                      />
+                      <TouchableOpacity style={styles.iconBtn} onPress={handleSaveEditRow}>
+                        <Text style={{ fontSize: 16 }}>💾</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity style={styles.iconBtn} onPress={() => setEditingIndex(null)}>
+                        <Text style={{ fontSize: 16 }}>❌</Text>
+                      </TouchableOpacity>
+                    </View>
+                  );
+                }
+
                 return (
                   <TouchableOpacity
-                    key={c.code}
+                    key={item.code + index}
                     style={[
                       styles.currencyTableRow,
                       rowDirectionStyle,
-                      isRowSelected && { backgroundColor: '#e7f5ff' }
+                      isSelected && { backgroundColor: '#e7f5ff', borderLeftWidth: 4, borderLeftColor: colors.primary }
                     ]}
-                    onPress={() => {
-                      setBaseCurrency(c.code);
-                      setExchangeRate(c.defaultRateToILS.toString());
-                      setIsCustomMode(false);
-                    }}
-                    activeOpacity={0.7}
+                    onPress={() => handleSelectCurrency(item)}
+                    activeOpacity={0.8}
                   >
-                    <Text style={[styles.currencyTableCell, textAlignStyle, { flex: 2, fontWeight: isRowSelected ? 'bold' : 'normal' }]}>
-                      {formatCurrencyLabel(c.code, c.symbol)}
+                    <View style={{ width: 40, alignItems: 'center' }}>
+                      <Text style={{ fontSize: 16 }}>
+                        {isSelected ? '🔘' : '⚪'}
+                      </Text>
+                    </View>
+                    <Text style={[styles.currencyTableCell, textAlignStyle, { flex: 2, fontWeight: isSelected ? 'bold' : 'normal' }]}>
+                      {item.code} ({item.symbol})
                     </Text>
                     <Text style={[styles.currencyTableCell, { width: 50, textAlign: 'center', fontWeight: 'bold', color: colors.primary }]}>
-                      {c.symbol}
+                      {item.symbol}
                     </Text>
                     <Text style={[styles.currencyTableCell, textAlignStyle, { flex: 2, color: '#495057' }]}>
-                      1 {c.code} = ₪{c.defaultRateToILS.toFixed(2)}
+                      1 {item.code} = ₪{item.rateToILS.toFixed(2)}
                     </Text>
+                    <View style={[rowDirectionStyle, { width: 80, justifyContent: 'center', gap: 6 }]}>
+                      <TouchableOpacity onPress={() => handleStartEditRow(index)} style={styles.iconBtn}>
+                        <Text style={{ fontSize: 14 }}>✏️</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={() => handleDeleteRow(index)} style={styles.iconBtn}>
+                        <Text style={{ fontSize: 14 }}>🗑️</Text>
+                      </TouchableOpacity>
+                    </View>
                   </TouchableOpacity>
                 );
               })}
-            </View>
+            </ScrollView>
+          </View>
+
+          {/* Active Selected Currency Rate Detail */}
+          <View style={{ marginBottom: 16 }}>
+            <Text style={[styles.label, textAlignStyle]}>
+              {isRTL 
+                ? `שער המרה פעיל מ-${selectedItem.code} (${selectedItem.symbol}) לשקל (ILS) *` 
+                : `Active Exchange Rate from ${selectedItem.code} (${selectedItem.symbol}) to ILS *`}
+            </Text>
+            <TextInput
+              style={[styles.input, textAlignStyle]}
+              value={exchangeRate}
+              onChangeText={setExchangeRate}
+              keyboardType="decimal-pad"
+              placeholder="e.g. 3.70"
+              placeholderTextColor="#adb5bd"
+            />
           </View>
 
           {/* Time Format Selector */}
-          <Text style={[styles.label, textAlignStyle, { marginTop: 14 }]}>
+          <Text style={[styles.label, textAlignStyle, { marginTop: 8 }]}>
             ⏱️ {isRTL ? 'פורמט הצגת שעה *' : 'Display Time Format *'}
           </Text>
           <View style={[styles.currencyRow, rowDirectionStyle]}>
@@ -317,15 +441,15 @@ export default function TripSettingsScreen() {
           <View style={[styles.previewCard, rowDirectionStyle]}>
             <Text style={styles.previewText}>
               💡 {isRTL 
-                ? `תצוגה מקדימה: 100 ${formatCurrencyLabel(activeDisplayCurrency)} = ₪${(100 * (parseFloat(exchangeRate) || 0)).toFixed(2)} | פורמט: ${timeFormat}`
-                : `Preview: 100 ${formatCurrencyLabel(activeDisplayCurrency)} = ₪${(100 * (parseFloat(exchangeRate) || 0)).toFixed(2)} | Format: ${timeFormat}`}
+                ? `תצוגה מקדימה: 100 ${selectedItem.code} (${selectedItem.symbol}) = ₪${(100 * (parseFloat(exchangeRate) || 0)).toFixed(2)} | פורמט: ${timeFormat}`
+                : `Preview: 100 ${selectedItem.code} (${selectedItem.symbol}) = ₪${(100 * (parseFloat(exchangeRate) || 0)).toFixed(2)} | Format: ${timeFormat}`}
             </Text>
           </View>
 
           {/* Action Buttons */}
           <TouchableOpacity
             style={styles.saveBtn}
-            onPress={handleSave}
+            onPress={handleSaveSettings}
             disabled={saving}
             activeOpacity={0.8}
           >
@@ -348,7 +472,7 @@ export default function TripSettingsScreen() {
             </Text>
           </TouchableOpacity>
         </View>
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -359,9 +483,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8f9fa',
   },
   container: {
-    flex: 1,
     padding: 20,
-    justifyContent: Platform.OS === 'web' ? 'center' : 'flex-start',
     alignItems: 'center',
   },
   loaderContainer: {
@@ -372,7 +494,7 @@ const styles = StyleSheet.create({
   },
   card: {
     width: '100%',
-    maxWidth: 500,
+    maxWidth: 550,
     backgroundColor: colors.white,
     borderRadius: 16,
     padding: 24,
@@ -395,7 +517,7 @@ const styles = StyleSheet.create({
     fontFamily: typography.fontFamily,
     fontSize: typography.sizes.sm,
     color: colors.textLight,
-    marginBottom: 24,
+    marginBottom: 20,
     lineHeight: 20,
   },
   label: {
@@ -403,13 +525,144 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.sm,
     fontWeight: typography.weights.bold,
     color: colors.text,
+    marginBottom: 8,
+  },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 10,
+  },
+  sectionTitleText: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: colors.primary,
+    flex: 1,
+  },
+  addRowTriggerBtn: {
+    backgroundColor: '#ebfbee',
+    borderColor: '#40c057',
+    borderWidth: 1,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 6,
+  },
+  addRowTriggerBtnText: {
+    color: '#2b8a3e',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  addRowFormCard: {
+    backgroundColor: '#f8f9fa',
+    borderColor: '#dee2e6',
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 12,
+  },
+  addRowFormTitle: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: '#212529',
+    marginBottom: 8,
+  },
+  formRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: 8,
+  },
+  formCol: {
+    justifyContent: 'center',
+  },
+  inputLabel: {
+    fontSize: 11,
+    color: '#495057',
+    marginBottom: 2,
+    fontWeight: 'bold',
+  },
+  tableInput: {
+    height: 36,
+    borderWidth: 1,
+    borderColor: '#ced4da',
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    fontSize: 13,
+    backgroundColor: '#fff',
+    color: '#212529',
+  },
+  formActionsRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 8,
+  },
+  saveRowBtn: {
+    backgroundColor: '#2b8a3e',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  saveRowBtnText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
+  },
+  cancelRowBtn: {
+    backgroundColor: '#e9ecef',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  cancelRowBtnText: {
+    color: '#495057',
+    fontSize: 12,
+  },
+  currencyTableContainer: {
+    borderWidth: 1,
+    borderColor: '#dee2e6',
+    borderRadius: 8,
+    overflow: 'hidden',
+    marginBottom: 16,
+    backgroundColor: '#fff',
+  },
+  currencyTableHeader: {
+    backgroundColor: '#f1f3f5',
+    borderBottomWidth: 1,
+    borderBottomColor: '#dee2e6',
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    alignItems: 'center',
+  },
+  currencyTableHeaderText: {
+    fontWeight: 'bold',
+    color: '#343a40',
+    fontSize: 12,
+  },
+  currencyTableRow: {
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f3f5',
+    alignItems: 'center',
+  },
+  currencyTableEditRow: {
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#74c0fc',
+    backgroundColor: '#e7f5ff',
+    alignItems: 'center',
+  },
+  currencyTableCell: {
+    fontSize: 13,
+    color: '#212529',
+  },
+  iconBtn: {
+    padding: 4,
   },
   currencyRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     gap: 8,
-    marginBottom: 20,
+    marginBottom: 16,
   },
   currencyChip: {
     paddingHorizontal: 16,
@@ -433,22 +686,21 @@ const styles = StyleSheet.create({
     color: colors.white,
   },
   input: {
-    height: 48,
+    height: 44,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: 8,
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
     fontFamily: typography.fontFamily,
     fontSize: typography.sizes.md,
     color: colors.text,
     backgroundColor: '#f8f9fa',
-    marginBottom: 16,
   },
   previewCard: {
     backgroundColor: '#e7f5ff',
     borderRadius: 8,
     padding: 12,
-    marginBottom: 24,
+    marginBottom: 20,
     borderWidth: 1,
     borderColor: '#a5d8ff',
   },
@@ -464,7 +716,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 12,
+    marginBottom: 10,
   },
   saveBtnText: {
     fontFamily: typography.fontFamily,
@@ -484,37 +736,5 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.md,
     fontWeight: typography.weights.bold,
     color: '#495057',
-  },
-  currencyTableContainer: {
-    borderWidth: 1,
-    borderColor: '#dee2e6',
-    borderRadius: 8,
-    overflow: 'hidden',
-    marginBottom: 16,
-    backgroundColor: '#fff',
-  },
-  currencyTableHeader: {
-    backgroundColor: '#f1f3f5',
-    borderBottomWidth: 1,
-    borderBottomColor: '#dee2e6',
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    alignItems: 'center',
-  },
-  currencyTableHeaderText: {
-    fontWeight: 'bold',
-    color: '#343a40',
-    fontSize: 12,
-  },
-  currencyTableRow: {
-    paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f1f3f5',
-    alignItems: 'center',
-  },
-  currencyTableCell: {
-    fontSize: 13,
-    color: '#212529',
   },
 });

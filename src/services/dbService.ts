@@ -504,17 +504,19 @@ export const getTrip = async (tripId: string): Promise<Trip | null> => {
     baseCurrency: data.baseCurrency,
     exchangeRateToILS: data.exchangeRateToILS,
     timeFormat: data.timeFormat || '24h',
+    currenciesTable: data.currenciesTable || undefined,
   } as Trip;
 };
 
 /**
- * Updates the currency settings and time format for a specific trip in Firestore.
+ * Updates the currency settings, time format, and custom currency table for a specific trip in Firestore.
  */
 export const updateTripSettings = async (
   tripId: string,
   baseCurrency: string,
   exchangeRateToILS: number,
-  timeFormat?: '24h' | '12h'
+  timeFormat?: '24h' | '12h',
+  currenciesTable?: any[]
 ): Promise<void> => {
   const tripDocRef = doc(db, 'trips', tripId);
   const data: any = {
@@ -522,6 +524,7 @@ export const updateTripSettings = async (
     exchangeRateToILS,
   };
   if (timeFormat) data.timeFormat = timeFormat;
+  if (currenciesTable) data.currenciesTable = currenciesTable;
   await updateDoc(tripDocRef, data);
 };
 
