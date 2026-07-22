@@ -1,4 +1,4 @@
-import { collection, addDoc, getDocs, query, where, doc, getDoc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, addDoc, getDocs, getDocsFromCache, query, where, doc, getDoc, getDocFromCache, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../config/firebaseConfig';
 import { Group, Trip, Event, Expense, Document, PackingItem } from '../types';
 
@@ -236,7 +236,19 @@ export const createEvent = async (
 export const getEventsForTrip = async (tripId: string): Promise<Event[]> => {
   const eventsCollection = collection(db, 'events');
   const q = query(eventsCollection, where('tripId', '==', tripId));
-  const querySnapshot = await getDocs(q);
+  
+  let querySnapshot;
+  try {
+    querySnapshot = await getDocs(q);
+  } catch (err) {
+    console.warn('[dbService] Network unavailable for getEventsForTrip, reading from offline cache:', err);
+    try {
+      querySnapshot = await getDocsFromCache(q);
+    } catch (cacheErr) {
+      console.error('[dbService] Cache query failed for getEventsForTrip:', cacheErr);
+      return [];
+    }
+  }
 
   return querySnapshot.docs.map((doc) => {
     const data = doc.data();
@@ -456,8 +468,19 @@ export const deletePackingItem = async (itemId: string): Promise<void> => {
  */
 export const getTrip = async (tripId: string): Promise<Trip | null> => {
   const tripDocRef = doc(db, 'trips', tripId);
-  const tripSnapshot = await getDoc(tripDocRef);
-  if (!tripSnapshot.exists()) {
+  let tripSnapshot;
+  try {
+    tripSnapshot = await getDoc(tripDocRef);
+  } catch (err) {
+    console.warn('[dbService] Network unavailable for getTrip, reading from offline cache:', err);
+    try {
+      tripSnapshot = await getDocFromCache(tripDocRef);
+    } catch (cacheErr) {
+      console.error('[dbService] Cache query failed for getTrip:', cacheErr);
+      return null;
+    }
+  }
+  if (!tripSnapshot || !tripSnapshot.exists()) {
     return null;
   }
   const data = tripSnapshot.data();

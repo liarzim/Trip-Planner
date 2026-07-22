@@ -56,10 +56,10 @@ export default function TripSettingsScreen() {
 
   const handleSave = async () => {
     const parsedRate = parseFloat(exchangeRate);
-    if (isNaN(parsedRate) || parsedRate <= 0) {
+    if (isNaN(parsedRate) || !isFinite(parsedRate) || parsedRate <= 0) {
       const errorMsg = isRTL 
-        ? 'אנא הזן שער חליפין תקין (גדול מ-0)' 
-        : 'Please enter a valid exchange rate (greater than 0)';
+        ? 'אנא הזן שער חליפין תקין (מספר חיובי גדול מ-0)' 
+        : 'Please enter a valid numeric exchange rate (positive number greater than 0)';
       if (Platform.OS === 'web') {
         alert(errorMsg);
       } else {

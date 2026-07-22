@@ -807,8 +807,22 @@ export default function TripDashboardScreen() {
     }
   };
 
-  // Calculate total spent across logged expenses
-  const totalSpent = expenses.reduce((sum, item) => sum + item.amount, 0);
+  // Calculate total spent across logged expenses with financial data sanitization
+  const sanitizeExchangeRate = (rate: number | null | undefined): number => {
+    if (rate === null || rate === undefined || isNaN(rate) || !isFinite(rate) || rate <= 0) {
+      return 1.0;
+    }
+    return rate;
+  };
+
+  const safeExchangeRate = sanitizeExchangeRate(tripExchangeRate);
+
+  const totalSpent = expenses.reduce((sum, item) => {
+    const amt = Number(item.amount);
+    return sum + (isNaN(amt) || !isFinite(amt) ? 0 : amt);
+  }, 0);
+
+  const totalSpentInILS = totalSpent * safeExchangeRate;
 
   const getEventBadgeStyle = (type: string) => {
     switch (type.toLowerCase()) {
@@ -1289,7 +1303,10 @@ export default function TripDashboardScreen() {
       {/* Total Spent Summary Card - Redesigned as Prominent Hero Card */}
       <View style={styles.summaryCard}>
         <Text style={styles.summaryTitle}>{t('dashboard.total_spent')}</Text>
-        <Text style={styles.summaryAmount}>${totalSpent.toFixed(2)} USD</Text>
+        <Text style={styles.summaryAmount}>
+          ${totalSpent.toFixed(2)} {tripBaseCurrency || 'USD'}
+          {tripExchangeRate && tripExchangeRate > 0 && tripBaseCurrency !== 'ILS' ? ` (₪${totalSpentInILS.toFixed(2)} ILS)` : ''}
+        </Text>
         <Text style={styles.summarySubtitle}>
           {t('dashboard.logged_from', { count: expenses.length.toString() })}
         </Text>
