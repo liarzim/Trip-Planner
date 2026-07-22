@@ -78,8 +78,10 @@ export default function TripDashboardScreen() {
   const [isQrModalVisible, setIsQrModalVisible] = useState(false);
   const [selectedBookingRef, setSelectedBookingRef] = useState('');
 
-  // Trip start date state
+  // Trip details states
+  const [tripName, setTripName] = useState('');
   const [tripStartDate, setTripStartDate] = useState('');
+  const [tripEndDate, setTripEndDate] = useState('');
 
   // Trip budget settings states
   const [tripBaseCurrency, setTripBaseCurrency] = useState('USD');
@@ -254,7 +256,9 @@ export default function TripDashboardScreen() {
             setExpenses(fetchedExpenses);
             setDocuments(fetchedDocs);
             if (fetchedTrip) {
-              setTripStartDate(fetchedTrip.startDate);
+              setTripName(fetchedTrip.name || '');
+              setTripStartDate(fetchedTrip.startDate || '');
+              setTripEndDate(fetchedTrip.endDate || '');
               if (fetchedTrip.baseCurrency) {
                 setTripBaseCurrency(fetchedTrip.baseCurrency);
               }
@@ -1382,6 +1386,21 @@ export default function TripDashboardScreen() {
             <LanguageSelector />
           </View>
         </View>
+
+        {/* Always Visible Persistent Trip Title & Dates Banner */}
+        {tripName ? (
+          <View style={styles.persistentTripHeaderBanner}>
+            <Text style={styles.persistentTripName}>
+              {tripName}
+            </Text>
+            {(tripStartDate || tripEndDate) ? (
+              <Text style={styles.persistentTripDates}>
+                📅 {tripStartDate}{tripEndDate ? ` — ${tripEndDate}` : ''}
+              </Text>
+            ) : null}
+          </View>
+        ) : null}
+
         <View style={{ flex: 1 }}>
           <DashboardMap events={events} focusedEventId={focusedEventId} />
         </View>
@@ -1415,6 +1434,20 @@ export default function TripDashboardScreen() {
           <LanguageSelector />
         </View>
       </View>
+
+      {/* Always Visible Persistent Trip Title & Dates Banner */}
+      {tripName ? (
+        <View style={styles.persistentTripHeaderBanner}>
+          <Text style={styles.persistentTripName}>
+            {tripName}
+          </Text>
+          {(tripStartDate || tripEndDate) ? (
+            <Text style={styles.persistentTripDates}>
+              📅 {tripStartDate}{tripEndDate ? ` — ${tripEndDate}` : ''}
+            </Text>
+          ) : null}
+        </View>
+      ) : null}
 
       {/* Offline Mode Warning Banner */}
       {!isOnline && (
@@ -3334,5 +3367,36 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.md,
     fontWeight: typography.weights.bold,
     color: colors.white,
+  },
+  persistentTripHeaderBanner: {
+    backgroundColor: '#ffffff',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e9ecef',
+    elevation: 2,
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    width: '100%',
+  },
+  persistentTripName: {
+    fontFamily: typography.fontFamily,
+    fontSize: 24,
+    fontWeight: 'bold',
+    textDecorationLine: 'underline',
+    color: colors.primary,
+    textAlign: 'center',
+    marginBottom: 4,
+  },
+  persistentTripDates: {
+    fontFamily: typography.fontFamily,
+    fontSize: typography.sizes.md,
+    color: colors.textLight,
+    textAlign: 'center',
+    fontWeight: '500',
   },
 });
