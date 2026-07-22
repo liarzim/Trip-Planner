@@ -1,6 +1,7 @@
-import React, { useRef, useEffect } from 'react';
-import { StyleSheet, View, Text, Platform } from 'react-native';
-import MapView, { Marker, MapPressEvent } from 'react-native-maps';
+import React from 'react';
+import { Platform } from 'react-native';
+import MapPickerWeb from './MapPicker.web';
+import MapPickerNative from './MapPicker.native';
 
 interface MapPickerProps {
   latitude?: number;
@@ -11,141 +12,9 @@ interface MapPickerProps {
   t?: (key: string) => string;
 }
 
-export default function MapPicker({
-  latitude,
-  longitude,
-  onSelectLocation,
-  lang,
-  isRTL,
-  t
-}: MapPickerProps) {
-  const mapRef = useRef<MapView>(null);
-  const currentLat = latitude || 31.7683;
-  const currentLon = longitude || 35.2137;
-
-  useEffect(() => {
-    if (latitude && longitude && mapRef.current && Platform.OS !== 'web') {
-      try {
-        if (typeof (mapRef.current as any).animateToRegion === 'function') {
-          (mapRef.current as any).animateToRegion({
-            latitude,
-            longitude,
-            latitudeDelta: 0.05,
-            longitudeDelta: 0.05,
-          }, 500);
-        }
-      } catch (e) {
-        // Fallback
-      }
-    }
-  }, [latitude, longitude]);
-
-  const handleMapPress = (e: MapPressEvent) => {
-    if (e && e.nativeEvent && e.nativeEvent.coordinate) {
-      const { latitude: clickLat, longitude: clickLon } = e.nativeEvent.coordinate;
-      onSelectLocation(clickLat, clickLon);
-    }
-  };
-
-  const handleMarkerDragEnd = (e: any) => {
-    if (e && e.nativeEvent && e.nativeEvent.coordinate) {
-      const { latitude: dragLat, longitude: dragLon } = e.nativeEvent.coordinate;
-      onSelectLocation(dragLat, dragLon);
-    }
-  };
-
+export default function MapPicker(props: MapPickerProps) {
   if (Platform.OS === 'web') {
-    const googleEmbedUrl = `https://maps.google.com/maps?q=${currentLat},${currentLon}&z=14&output=embed`;
-    const googleDirectUrl = `https://www.google.com/maps?q=${currentLat},${currentLon}`;
-
-    return (
-      <View style={styles.container}>
-        <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-          <Text style={[styles.instruction, { marginBottom: 0, fontWeight: 'bold', color: '#2b8a3e' }]}>
-            🗺️ {isRTL ? `מפת אישור מיקום: (${currentLat.toFixed(4)}, ${currentLon.toFixed(4)})` : `Location Map: (${currentLat.toFixed(4)}, ${currentLon.toFixed(4)})`}
-          </Text>
-          {React.createElement('a', {
-            href: googleDirectUrl,
-            target: '_blank',
-            rel: 'noopener noreferrer',
-            style: {
-              fontSize: '12px',
-              color: '#1971c2',
-              fontWeight: 'bold',
-              textDecoration: 'none',
-            }
-          }, isRTL ? '↗️ פתח במפת Google' : '↗️ Open Google Maps')}
-        </View>
-
-        <View style={styles.mapContainer}>
-          {React.createElement('iframe', {
-            src: googleEmbedUrl,
-            style: {
-              width: '100%',
-              height: '240px',
-              border: 'none',
-              borderRadius: '12px',
-            },
-            title: 'Location Map',
-            allowFullScreen: true,
-            loading: 'lazy',
-          })}
-        </View>
-      </View>
-    );
+    return <MapPickerWeb {...props} />;
   }
-
-  return (
-    <View style={styles.container}>
-      <Text style={[styles.instruction, { textAlign: isRTL ? 'right' : 'left' }]}>
-        {t ? t('event.pin_instruction') : 'Tap the map or drag the pin to set coordinates'}
-      </Text>
-      <View style={styles.mapContainer}>
-        <MapView
-          ref={mapRef}
-          style={styles.map}
-          region={{
-            latitude: currentLat,
-            longitude: currentLon,
-            latitudeDelta: 0.05,
-            longitudeDelta: 0.05,
-          }}
-          onPress={handleMapPress}
-        >
-          <Marker
-            coordinate={{ latitude: currentLat, longitude: currentLon }}
-            draggable
-            onDragEnd={handleMarkerDragEnd}
-            title={t ? t('event.pin_location') : 'Event Location'}
-          />
-        </MapView>
-      </View>
-    </View>
-  );
+  return <MapPickerNative {...props} />;
 }
-
-const styles = StyleSheet.create({
-  container: {
-    marginVertical: 10,
-  },
-  instruction: {
-    fontSize: 12,
-    color: '#868e96',
-    marginBottom: 6,
-    fontWeight: '500',
-  },
-  mapContainer: {
-    height: 240,
-    width: '100%',
-    borderRadius: 12,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: '#ced4da',
-    backgroundColor: '#e9ecef',
-  },
-  map: {
-    width: '100%',
-    height: '100%',
-    minHeight: 240,
-  },
-});

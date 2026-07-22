@@ -1,5 +1,5 @@
-import React, { useEffect, useRef } from 'react';
-import { View, StyleSheet, Text } from 'react-native';
+import React from 'react';
+import { StyleSheet, View, Text } from 'react-native';
 
 interface MapPickerProps {
   latitude?: number;
@@ -18,123 +18,47 @@ export default function MapPicker({
   isRTL,
   t
 }: MapPickerProps) {
-  const mapRef = useRef<any>(null);
-  const markerRef = useRef<any>(null);
+  const currentLat = latitude || 31.7683;
+  const currentLon = longitude || 35.2137;
 
-  // Default to Jerusalem if coordinates aren't set
-  const initialLat = latitude ? parseFloat(latitude.toString()) : 31.7683;
-  const initialLon = longitude ? parseFloat(longitude.toString()) : 35.2137;
-
-  useEffect(() => {
-    // Load Leaflet CSS
-    if (!document.getElementById('leaflet-css')) {
-      const link = document.createElement('link');
-      link.id = 'leaflet-css';
-      link.rel = 'stylesheet';
-      link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
-      document.head.appendChild(link);
-    }
-
-    const runInit = () => {
-      const L = (window as any).L;
-      if (!L) return;
-
-      const container = document.getElementById('web-map-picker');
-      if (!container) return;
-
-      if (!mapRef.current) {
-        // Initialize Leaflet Map
-        const map = L.map('web-map-picker').setView([initialLat, initialLon], 13);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          attribution: '&copy; OpenStreetMap contributors'
-        }).addTo(map);
-
-        mapRef.current = map;
-
-        // Custom marker icon using standard Leaflet CDN images to prevent path issues
-        const defaultIcon = L.icon({
-          iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-          shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-          iconSize: [25, 41],
-          iconAnchor: [12, 41],
-          popupAnchor: [1, -34],
-          shadowSize: [41, 41]
-        });
-
-        // Add draggable marker
-        const marker = L.marker([initialLat, initialLon], {
-          draggable: true,
-          icon: defaultIcon
-        }).addTo(map);
-        markerRef.current = marker;
-
-        // Listen for drag events to update parent inputs
-        marker.on('dragend', () => {
-          const position = marker.getLatLng();
-          onSelectLocation(parseFloat(position.lat.toFixed(6)), parseFloat(position.lng.toFixed(6)));
-        });
-
-        // Listen for map clicks to place marker and update parent inputs
-        map.on('click', (e: any) => {
-          marker.setLatLng(e.latlng);
-          onSelectLocation(parseFloat(e.latlng.lat.toFixed(6)), parseFloat(e.latlng.lng.toFixed(6)));
-        });
-      }
-    };
-
-    // Load Leaflet Script
-    const scriptId = 'leaflet-js';
-    if (!(window as any).L) {
-      if (!document.getElementById(scriptId)) {
-        const script = document.createElement('script');
-        script.id = scriptId;
-        script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
-        script.onload = runInit;
-        document.head.appendChild(script);
-      }
-    } else {
-      runInit();
-    }
-
-    // Cleanup: destroy map instance to prevent Leaflet container reuse error on remounting
-    return () => {
-      if (mapRef.current) {
-        mapRef.current.remove();
-        mapRef.current = null;
-        markerRef.current = null;
-      }
-    };
-  }, []);
-
-  // Update map and marker if inputs coordinates are typed/modified
-  useEffect(() => {
-    const map = mapRef.current;
-    const marker = markerRef.current;
-
-    if (map && marker && latitude && longitude) {
-      const latVal = parseFloat(latitude.toString());
-      const lonVal = parseFloat(longitude.toString());
-
-      if (!isNaN(latVal) && !isNaN(lonVal)) {
-        const currentCenter = map.getCenter();
-        const diffLat = Math.abs(currentCenter.lat - latVal);
-        const diffLon = Math.abs(currentCenter.lng - lonVal);
-
-        // Update view if coordinate differs significantly
-        if (diffLat > 0.0001 || diffLon > 0.0001) {
-          map.setView([latVal, lonVal], map.getZoom());
-          marker.setLatLng([latVal, lonVal]);
-        }
-      }
-    }
-  }, [latitude, longitude]);
+  const googleEmbedUrl = `https://maps.google.com/maps?q=${currentLat},${currentLon}&z=14&output=embed`;
+  const googleDirectUrl = `https://www.google.com/maps?q=${currentLat},${currentLon}`;
 
   return (
     <View style={styles.container}>
-      <Text style={[styles.instruction, { textAlign: isRTL ? 'right' : 'left' }]}>
-        {t ? t('event.pin_instruction') : 'Tap the map or drag the pin to set coordinates'}
-      </Text>
-      <div id="web-map-picker" style={{ height: '220px', borderRadius: '12px', border: '1px solid #ced4da', zIndex: 1 }} />
+      <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+        <Text style={[styles.instruction, { marginBottom: 0, fontWeight: 'bold', color: '#2b8a3e' }]}>
+          🗺️ {isRTL ? `מפת אישור מיקום: (${currentLat.toFixed(4)}, ${currentLon.toFixed(4)})` : `Location Map: (${currentLat.toFixed(4)}, ${currentLon.toFixed(4)})`}
+        </Text>
+        <a
+          href={googleDirectUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            fontSize: '12px',
+            color: '#1971c2',
+            fontWeight: 'bold',
+            textDecoration: 'none',
+          }}
+        >
+          {isRTL ? '↗️ פתח במפת Google' : '↗️ Open Google Maps'}
+        </a>
+      </View>
+
+      <View style={styles.mapContainer}>
+        <iframe
+          src={googleEmbedUrl}
+          style={{
+            width: '100%',
+            height: '240px',
+            border: 'none',
+            borderRadius: '12px',
+          }}
+          title="Location Map"
+          allowFullScreen
+          loading="lazy"
+        />
+      </View>
     </View>
   );
 }
@@ -148,5 +72,14 @@ const styles = StyleSheet.create({
     color: '#868e96',
     marginBottom: 6,
     fontWeight: '500',
+  },
+  mapContainer: {
+    height: 240,
+    width: '100%',
+    borderRadius: 12,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#ced4da',
+    backgroundColor: '#e9ecef',
   },
 });
