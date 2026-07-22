@@ -107,7 +107,7 @@ export default function TimePickerInput({
     textAlign: 'center'
   };
 
-  const flexDirStyle = { flexDirection: (isRTL ? 'row-reverse' : 'row') as 'row' | 'row-reverse' };
+  const flexDirStyle = { flexDirection: 'row' as const };
 
   if (Platform.OS === 'web') {
     return (
