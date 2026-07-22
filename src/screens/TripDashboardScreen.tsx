@@ -41,6 +41,7 @@ import DashboardMap from '../components/DashboardMap';
 import PackingList from '../components/PackingList';
 import { formatTimeByPreference } from '../utils/timeFormatter';
 import TimePickerInput from '../components/TimePickerInput';
+import { formatCurrencyLabel } from '../utils/currencyRegistry';
 
 type TripDashboardRouteProp = RouteProp<RootStackParamList, 'TripDashboard'>;
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'TripDashboard'>;
@@ -1939,7 +1940,7 @@ export default function TripDashboardScreen() {
                       }}
                     >
                       {tripBaseCurrency && !['USD', 'ILS', 'EUR', 'GBP', 'CAD', 'AUD', 'JPY', 'CHF', 'CNY', 'NZD', 'THB', 'INR', 'AED', 'SEK', 'NOK'].includes(tripBaseCurrency) && (
-                        <option value={tripBaseCurrency}>{tripBaseCurrency}</option>
+                        <option value={tripBaseCurrency}>{formatCurrencyLabel(tripBaseCurrency)}</option>
                       )}
                       <option value="USD">USD ($)</option>
                       <option value="ILS">ILS (₪)</option>

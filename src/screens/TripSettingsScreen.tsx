@@ -17,6 +17,7 @@ import { getTrip, updateTripSettings } from '../services/dbService';
 import { useTranslation } from '../services/translationService';
 import { colors } from '../theme/colors';
 import { typography } from '../theme/typography';
+import { SUPPORTED_CURRENCIES, formatCurrencyLabel, getCurrencySymbol } from '../utils/currencyRegistry';
 
 type TripSettingsRouteProp = RouteProp<RootStackParamList, 'TripSettings'>;
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'TripSettings'>;
@@ -149,34 +150,42 @@ export default function TripSettingsScreen() {
             {isRTL ? 'מטבע בסיס *' : 'Base Currency *'}
           </Text>
           <View style={[styles.currencyRow, rowDirectionStyle, { flexWrap: 'wrap' }]}>
-            {POPULAR_CURRENCIES.map((curr) => (
-              <TouchableOpacity
-                key={curr}
-                style={[
-                  styles.currencyChip,
-                  (isCustomMode ? curr === 'CUSTOM' : baseCurrency === curr) && styles.currencyChipSelected
-                ]}
-                onPress={() => {
-                  if (curr === 'CUSTOM') {
-                    setBaseCurrency('CUSTOM');
-                    setIsCustomMode(true);
-                  } else {
-                    setBaseCurrency(curr);
-                    setIsCustomMode(false);
-                  }
-                }}
-                activeOpacity={0.7}
-              >
-                <Text
+            {POPULAR_CURRENCIES.map((curr) => {
+              const isSelected = isCustomMode ? curr === 'CUSTOM' : baseCurrency === curr;
+              const displayLabel = curr === 'CUSTOM'
+                ? (isRTL ? '➕ אחר (מותאם אישית)' : '➕ Custom Currency')
+                : formatCurrencyLabel(curr);
+              return (
+                <TouchableOpacity
+                  key={curr}
                   style={[
-                    styles.currencyChipText,
-                    (isCustomMode ? curr === 'CUSTOM' : baseCurrency === curr) && styles.currencyChipTextSelected
+                    styles.currencyChip,
+                    isSelected && styles.currencyChipSelected
                   ]}
+                  onPress={() => {
+                    if (curr === 'CUSTOM') {
+                      setBaseCurrency('CUSTOM');
+                      setIsCustomMode(true);
+                    } else {
+                      setBaseCurrency(curr);
+                      setIsCustomMode(false);
+                      const found = SUPPORTED_CURRENCIES.find(c => c.code === curr);
+                      if (found) setExchangeRate(found.defaultRateToILS.toString());
+                    }
+                  }}
+                  activeOpacity={0.7}
                 >
-                  {curr === 'CUSTOM' ? (isRTL ? '➕ אחר (מותאם אישית)' : '➕ Custom Currency') : curr}
-                </Text>
-              </TouchableOpacity>
-            ))}
+                  <Text
+                    style={[
+                      styles.currencyChipText,
+                      isSelected && styles.currencyChipTextSelected
+                    ]}
+                  >
+                    {displayLabel}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
 
           {/* Custom Currency Text Input if CUSTOM selected */}
@@ -199,8 +208,8 @@ export default function TripSettingsScreen() {
           {/* Exchange Rate Input */}
           <Text style={[styles.label, textAlignStyle]}>
             {isRTL 
-              ? `שער המרה מ-${activeDisplayCurrency} לשקל (ILS) *` 
-              : `Exchange Rate from ${activeDisplayCurrency} to ILS *`}
+              ? `שער המרה מ-${formatCurrencyLabel(activeDisplayCurrency)} לשקל (ILS) *` 
+              : `Exchange Rate from ${formatCurrencyLabel(activeDisplayCurrency)} to ILS *`}
           </Text>
           <TextInput
             style={[styles.input, textAlignStyle]}
@@ -210,6 +219,55 @@ export default function TripSettingsScreen() {
             placeholder="e.g. 4.05"
             placeholderTextColor="#adb5bd"
           />
+
+          {/* Currency Reference & Exchange Rates Table */}
+          <Text style={[styles.label, textAlignStyle, { marginTop: 10, fontSize: 13, color: colors.primary }]}>
+            📊 {isRTL ? 'טבלת מטבעות ושערי המרה (לחץ לבחירה)' : 'Currency Rates Reference Table (Tap to select)'}
+          </Text>
+          <View style={styles.currencyTableContainer}>
+            <View style={[styles.currencyTableHeader, rowDirectionStyle]}>
+              <Text style={[styles.currencyTableCell, styles.currencyTableHeaderText, textAlignStyle, { flex: 2 }]}>
+                {isRTL ? 'מטבע (שם)' : 'Currency (Code)'}
+              </Text>
+              <Text style={[styles.currencyTableCell, styles.currencyTableHeaderText, { width: 50, textAlign: 'center' }]}>
+                {isRTL ? 'סמל' : 'Symbol'}
+              </Text>
+              <Text style={[styles.currencyTableCell, styles.currencyTableHeaderText, textAlignStyle, { flex: 2 }]}>
+                {isRTL ? 'שער לשקל (ILS)' : 'Rate to ILS (₪)'}
+              </Text>
+            </View>
+            <View style={{ maxHeight: 150, overflow: 'auto' as any }}>
+              {SUPPORTED_CURRENCIES.map((c) => {
+                const isRowSelected = !isCustomMode && baseCurrency === c.code;
+                return (
+                  <TouchableOpacity
+                    key={c.code}
+                    style={[
+                      styles.currencyTableRow,
+                      rowDirectionStyle,
+                      isRowSelected && { backgroundColor: '#e7f5ff' }
+                    ]}
+                    onPress={() => {
+                      setBaseCurrency(c.code);
+                      setExchangeRate(c.defaultRateToILS.toString());
+                      setIsCustomMode(false);
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.currencyTableCell, textAlignStyle, { flex: 2, fontWeight: isRowSelected ? 'bold' : 'normal' }]}>
+                      {formatCurrencyLabel(c.code, c.symbol)}
+                    </Text>
+                    <Text style={[styles.currencyTableCell, { width: 50, textAlign: 'center', fontWeight: 'bold', color: colors.primary }]}>
+                      {c.symbol}
+                    </Text>
+                    <Text style={[styles.currencyTableCell, textAlignStyle, { flex: 2, color: '#495057' }]}>
+                      1 {c.code} = ₪{c.defaultRateToILS.toFixed(2)}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
 
           {/* Time Format Selector */}
           <Text style={[styles.label, textAlignStyle, { marginTop: 14 }]}>
@@ -259,8 +317,8 @@ export default function TripSettingsScreen() {
           <View style={[styles.previewCard, rowDirectionStyle]}>
             <Text style={styles.previewText}>
               💡 {isRTL 
-                ? `תצוגה מקדימה: 100 ${baseCurrency} = ₪${(100 * (parseFloat(exchangeRate) || 0)).toFixed(2)} | פורמט: ${timeFormat}`
-                : `Preview: 100 ${baseCurrency} = ₪${(100 * (parseFloat(exchangeRate) || 0)).toFixed(2)} | Format: ${timeFormat}`}
+                ? `תצוגה מקדימה: 100 ${formatCurrencyLabel(activeDisplayCurrency)} = ₪${(100 * (parseFloat(exchangeRate) || 0)).toFixed(2)} | פורמט: ${timeFormat}`
+                : `Preview: 100 ${formatCurrencyLabel(activeDisplayCurrency)} = ₪${(100 * (parseFloat(exchangeRate) || 0)).toFixed(2)} | Format: ${timeFormat}`}
             </Text>
           </View>
 
@@ -426,5 +484,37 @@ const styles = StyleSheet.create({
     fontSize: typography.sizes.md,
     fontWeight: typography.weights.bold,
     color: '#495057',
+  },
+  currencyTableContainer: {
+    borderWidth: 1,
+    borderColor: '#dee2e6',
+    borderRadius: 8,
+    overflow: 'hidden',
+    marginBottom: 16,
+    backgroundColor: '#fff',
+  },
+  currencyTableHeader: {
+    backgroundColor: '#f1f3f5',
+    borderBottomWidth: 1,
+    borderBottomColor: '#dee2e6',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    alignItems: 'center',
+  },
+  currencyTableHeaderText: {
+    fontWeight: 'bold',
+    color: '#343a40',
+    fontSize: 12,
+  },
+  currencyTableRow: {
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f1f3f5',
+    alignItems: 'center',
+  },
+  currencyTableCell: {
+    fontSize: 13,
+    color: '#212529',
   },
 });
