@@ -9,6 +9,7 @@ export const SUPPORTED_CURRENCIES: CurrencyInfo[] = [
   { code: 'ILS', symbol: '₪', rateToILS: 1.00 },
   { code: 'EUR', symbol: '€', rateToILS: 4.05 },
   { code: 'GBP', symbol: '£', rateToILS: 4.70 },
+  { code: 'PLN', symbol: 'zł', rateToILS: 0.925 },
   { code: 'CAD', symbol: '$', rateToILS: 2.70 },
   { code: 'AUD', symbol: '$', rateToILS: 2.45 },
   { code: 'JPY', symbol: '¥', rateToILS: 0.024 },
@@ -20,6 +21,9 @@ export const SUPPORTED_CURRENCIES: CurrencyInfo[] = [
   { code: 'AED', symbol: 'د.إ', rateToILS: 1.01 },
   { code: 'SEK', symbol: 'kr', rateToILS: 0.35 },
   { code: 'NOK', symbol: 'kr', rateToILS: 0.34 },
+  { code: 'HUF', symbol: 'Ft', rateToILS: 0.010 },
+  { code: 'CZK', symbol: 'Kč', rateToILS: 0.16 },
+  { code: 'TRY', symbol: '₺', rateToILS: 0.11 },
 ];
 
 export const getCurrencySymbol = (code: string, currenciesTable?: CurrencyInfo[]): string => {
@@ -41,4 +45,42 @@ export const formatCurrencyLabel = (code: string, symbol?: string, currenciesTab
   if (!code) return 'USD ($)';
   const sym = symbol || getCurrencySymbol(code, currenciesTable);
   return `${code.toUpperCase()} (${sym})`;
+};
+
+export const getRateToILS = (code: string, currenciesTable?: CurrencyInfo[]): number => {
+  if (!code) return 1.0;
+  const clean = code.trim().toUpperCase();
+  if (clean === 'ILS') return 1.0;
+
+  if (currenciesTable && Array.isArray(currenciesTable)) {
+    const found = currenciesTable.find(c => c.code.toUpperCase() === clean);
+    if (found && typeof found.rateToILS === 'number' && found.rateToILS > 0) {
+      return found.rateToILS;
+    }
+  }
+
+  const supported = SUPPORTED_CURRENCIES.find(c => c.code.toUpperCase() === clean);
+  if (supported && typeof supported.rateToILS === 'number' && supported.rateToILS > 0) {
+    return supported.rateToILS;
+  }
+
+  return 1.0;
+};
+
+export const convertAmount = (
+  amount: number,
+  fromCode: string,
+  toCode: string,
+  currenciesTable?: CurrencyInfo[]
+): number => {
+  if (isNaN(amount) || amount <= 0) return 0;
+  if (!fromCode || !toCode || fromCode.toUpperCase() === toCode.toUpperCase()) return amount;
+
+  const fromRate = getRateToILS(fromCode, currenciesTable);
+  const toRate = getRateToILS(toCode, currenciesTable);
+
+  const amountInILS = amount * fromRate;
+  const converted = amountInILS / toRate;
+
+  return Math.round(converted * 100) / 100;
 };

@@ -42,7 +42,7 @@ import PackingList from '../components/PackingList';
 import { formatTimeByPreference } from '../utils/timeFormatter';
 import TimePickerInput from '../components/TimePickerInput';
 import DatePickerInput from '../components/DatePickerInput';
-import { formatCurrencyLabel, SUPPORTED_CURRENCIES } from '../utils/currencyRegistry';
+import { formatCurrencyLabel, SUPPORTED_CURRENCIES, getCurrencySymbol, convertAmount } from '../utils/currencyRegistry';
 import { CurrencyRowItem } from '../types';
 
 type TripDashboardRouteProp = RouteProp<RootStackParamList, 'TripDashboard'>;
@@ -699,10 +699,13 @@ export default function TripDashboardScreen() {
       return;
     }
 
-    const costVal = eventCost ? parseFloat(eventCost) : undefined;
+    let costVal = eventCost ? parseFloat(eventCost) : undefined;
     if (eventCost && isNaN(costVal!)) {
       setEventFormError(isRTL ? 'העלות חייבת להיות מספר תקין' : 'Cost must be a valid number');
       return;
+    }
+    if (typeof costVal === 'number' && eventCurrency && tripBaseCurrency) {
+      costVal = convertAmount(costVal, eventCurrency, tripBaseCurrency, tripCurrenciesTable);
     }
 
     // Step 4: Flight Specific Input Validations
@@ -2105,6 +2108,38 @@ export default function TripDashboardScreen() {
                   )}
                 </View>
               </View>
+
+              {/* Automated Currency Exchange Display */}
+              {(() => {
+                const numCost = parseFloat(eventCost);
+                if (!isNaN(numCost) && numCost > 0 && eventCurrency && tripBaseCurrency) {
+                  const convertedVal = convertAmount(numCost, eventCurrency, tripBaseCurrency, tripCurrenciesTable);
+                  const baseSymbol = getCurrencySymbol(tripBaseCurrency, tripCurrenciesTable);
+                  const isDifferentCurrency = eventCurrency.toUpperCase() !== tripBaseCurrency.toUpperCase();
+                  
+                  return (
+                    <View style={{
+                      marginBottom: 12,
+                      padding: 10,
+                      backgroundColor: isDifferentCurrency ? '#e7f5ff' : '#f8f9fa',
+                      borderRadius: 8,
+                      borderWidth: 1,
+                      borderColor: isDifferentCurrency ? '#a5d8ff' : '#dee2e6',
+                      flexDirection: isRTL ? 'row-reverse' : 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between'
+                    }}>
+                      <Text style={{ fontSize: 13, color: isDifferentCurrency ? '#1971c2' : '#495057', fontWeight: 'bold' }}>
+                        💱 {isRTL ? 'המרה אוטומטית למטבע הראשי של הטיול:' : 'Auto-Converted to Trip Base Currency:'}
+                      </Text>
+                      <Text style={{ fontSize: 14, color: isDifferentCurrency ? '#0b7285' : '#212529', fontWeight: 'bold' }}>
+                        ≈ {convertedVal.toLocaleString()} {baseSymbol} ({tripBaseCurrency})
+                      </Text>
+                    </View>
+                  );
+                }
+                return null;
+              })()}
 
               {/* Booking Reference */}
               <View style={{ marginBottom: 12 }}>
