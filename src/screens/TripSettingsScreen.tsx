@@ -21,7 +21,7 @@ import { typography } from '../theme/typography';
 type TripSettingsRouteProp = RouteProp<RootStackParamList, 'TripSettings'>;
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'TripSettings'>;
 
-const CURRENCIES = ['USD', 'EUR', 'GBP', 'CAD', 'AUD', 'ILS'];
+const POPULAR_CURRENCIES = ['USD', 'EUR', 'GBP', 'CAD', 'AUD', 'ILS', 'JPY', 'CHF', 'CNY', 'NZD', 'THB', 'INR', 'AED', 'CUSTOM'];
 
 export default function TripSettingsScreen() {
   const route = useRoute<TripSettingsRouteProp>();
@@ -33,6 +33,8 @@ export default function TripSettingsScreen() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [baseCurrency, setBaseCurrency] = useState('USD');
+  const [customCurrency, setCustomCurrency] = useState('');
+  const [isCustomMode, setIsCustomMode] = useState(false);
   const [exchangeRate, setExchangeRate] = useState('3.70');
   const [timeFormat, setTimeFormat] = useState<'24h' | '12h'>('24h');
   const [tripName, setTripName] = useState('');
@@ -43,7 +45,16 @@ export default function TripSettingsScreen() {
         const trip = await getTrip(tripId);
         if (trip) {
           setTripName(trip.name);
-          if (trip.baseCurrency) setBaseCurrency(trip.baseCurrency);
+          if (trip.baseCurrency) {
+            if (POPULAR_CURRENCIES.includes(trip.baseCurrency) && trip.baseCurrency !== 'CUSTOM') {
+              setBaseCurrency(trip.baseCurrency);
+              setIsCustomMode(false);
+            } else {
+              setBaseCurrency('CUSTOM');
+              setCustomCurrency(trip.baseCurrency);
+              setIsCustomMode(true);
+            }
+          }
           if (trip.exchangeRateToILS) setExchangeRate(trip.exchangeRateToILS.toString());
           if (trip.timeFormat) setTimeFormat(trip.timeFormat);
         }
@@ -57,6 +68,15 @@ export default function TripSettingsScreen() {
   }, [tripId]);
 
   const handleSave = async () => {
+    const finalCurrency = isCustomMode ? customCurrency.trim().toUpperCase() : baseCurrency;
+    if (!finalCurrency) {
+      const errorMsg = isRTL 
+        ? 'אנא הזן קוד מטבע תקין' 
+        : 'Please enter a valid currency code';
+      if (Platform.OS === 'web') alert(errorMsg); else Alert.alert('Error', errorMsg);
+      return;
+    }
+
     const parsedRate = parseFloat(exchangeRate);
     if (isNaN(parsedRate) || !isFinite(parsedRate) || parsedRate <= 0) {
       const errorMsg = isRTL 
@@ -72,7 +92,7 @@ export default function TripSettingsScreen() {
 
     try {
       setSaving(true);
-      await updateTripSettings(tripId, baseCurrency, parsedRate, timeFormat);
+      await updateTripSettings(tripId, finalCurrency, parsedRate, timeFormat);
       
       const successMsg = isRTL 
         ? 'ההגדרות נשמרו בהצלחה!' 
@@ -109,6 +129,8 @@ export default function TripSettingsScreen() {
     );
   }
 
+  const activeDisplayCurrency = isCustomMode ? (customCurrency.toUpperCase() || 'CURR') : baseCurrency;
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
@@ -126,34 +148,59 @@ export default function TripSettingsScreen() {
           <Text style={[styles.label, textAlignStyle]}>
             {isRTL ? 'מטבע בסיס *' : 'Base Currency *'}
           </Text>
-          <View style={[styles.currencyRow, rowDirectionStyle]}>
-            {CURRENCIES.map((curr) => (
+          <View style={[styles.currencyRow, rowDirectionStyle, { flexWrap: 'wrap' }]}>
+            {POPULAR_CURRENCIES.map((curr) => (
               <TouchableOpacity
                 key={curr}
                 style={[
                   styles.currencyChip,
-                  baseCurrency === curr && styles.currencyChipSelected
+                  (isCustomMode ? curr === 'CUSTOM' : baseCurrency === curr) && styles.currencyChipSelected
                 ]}
-                onPress={() => setBaseCurrency(curr)}
+                onPress={() => {
+                  if (curr === 'CUSTOM') {
+                    setBaseCurrency('CUSTOM');
+                    setIsCustomMode(true);
+                  } else {
+                    setBaseCurrency(curr);
+                    setIsCustomMode(false);
+                  }
+                }}
                 activeOpacity={0.7}
               >
                 <Text
                   style={[
                     styles.currencyChipText,
-                    baseCurrency === curr && styles.currencyChipTextSelected
+                    (isCustomMode ? curr === 'CUSTOM' : baseCurrency === curr) && styles.currencyChipTextSelected
                   ]}
                 >
-                  {curr}
+                  {curr === 'CUSTOM' ? (isRTL ? '➕ אחר (מותאם אישית)' : '➕ Custom Currency') : curr}
                 </Text>
               </TouchableOpacity>
             ))}
           </View>
 
+          {/* Custom Currency Text Input if CUSTOM selected */}
+          {isCustomMode && (
+            <View style={{ marginBottom: 12 }}>
+              <Text style={[styles.label, textAlignStyle]}>
+                {isRTL ? 'הזן קוד/סמל מטבע מותאם אישית (למשל: SGD, HUF, CZK, ₪) *' : 'Enter Custom Currency Code (e.g. SGD, HUF, CZK, ₪) *'}
+              </Text>
+              <TextInput
+                style={[styles.input, textAlignStyle, { backgroundColor: '#fff' }]}
+                value={customCurrency}
+                onChangeText={setCustomCurrency}
+                placeholder="e.g. SGD, HUF, CZK, ₪"
+                placeholderTextColor="#adb5bd"
+                autoCapitalize="characters"
+              />
+            </View>
+          )}
+
           {/* Exchange Rate Input */}
           <Text style={[styles.label, textAlignStyle]}>
             {isRTL 
-              ? `שער המרה מ-${baseCurrency} לשקל (ILS) *` 
-              : `Exchange Rate from ${baseCurrency} to ILS *`}
+              ? `שער המרה מ-${activeDisplayCurrency} לשקל (ILS) *` 
+              : `Exchange Rate from ${activeDisplayCurrency} to ILS *`}
           </Text>
           <TextInput
             style={[styles.input, textAlignStyle]}

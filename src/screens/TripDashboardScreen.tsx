@@ -40,6 +40,7 @@ import LanguageSelector from '../components/LanguageSelector';
 import DashboardMap from '../components/DashboardMap';
 import PackingList from '../components/PackingList';
 import { formatTimeByPreference } from '../utils/timeFormatter';
+import TimePickerInput from '../components/TimePickerInput';
 
 type TripDashboardRouteProp = RouteProp<RootStackParamList, 'TripDashboard'>;
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'TripDashboard'>;
@@ -1872,69 +1873,31 @@ export default function TripDashboardScreen() {
                 )}
               </View>
 
-              {/* Start & End Time Pickers */}
+              {/* Start & End Time Pickers conforming strictly to tripTimeFormat */}
               <View style={[styles.modalFormRow, rowDirectionStyle]}>
                 <View style={[styles.modalFormCol]}>
                   <Text style={[styles.modalFormLabel, textAlignStyle]}>
                     ⏰ {isRTL ? 'שעת התחלה *' : 'Start Time *'}
                   </Text>
-                  {Platform.OS === 'web' ? (
-                    <input 
-                      type="time"
-                      value={eventStartTime}
-                      onChange={(e) => setEventStartTime(e.target.value)}
-                      style={{
-                        backgroundColor: '#f8f9fa',
-                        border: '1px solid #dee2e6',
-                        borderRadius: '8px',
-                        padding: '10px 12px',
-                        fontSize: '14px',
-                        fontFamily: 'inherit',
-                        width: '100%',
-                        boxSizing: 'border-box',
-                        color: '#212529',
-                        cursor: 'pointer'
-                      }}
-                    />
-                  ) : (
-                    <TextInput
-                      style={[styles.modalFormInput, textAlignStyle]}
-                      placeholder="e.g. 10:30"
-                      value={eventStartTime}
-                      onChangeText={setEventStartTime}
-                    />
-                  )}
+                  <TimePickerInput
+                    value={eventStartTime}
+                    onChange={setEventStartTime}
+                    format={tripTimeFormat}
+                    isRTL={isRTL}
+                    placeholder="10:30"
+                  />
                 </View>
                 <View style={[styles.modalFormCol]}>
                   <Text style={[styles.modalFormLabel, textAlignStyle]}>
                     ⏰ {isRTL ? 'שעת סיום' : 'End Time'}
                   </Text>
-                  {Platform.OS === 'web' ? (
-                    <input 
-                      type="time"
-                      value={eventEndTime}
-                      onChange={(e) => setEventEndTime(e.target.value)}
-                      style={{
-                        backgroundColor: '#f8f9fa',
-                        border: '1px solid #dee2e6',
-                        borderRadius: '8px',
-                        padding: '10px 12px',
-                        fontSize: '14px',
-                        fontFamily: 'inherit',
-                        width: '100%',
-                        boxSizing: 'border-box',
-                        color: '#212529',
-                        cursor: 'pointer'
-                      }}
-                    />
-                  ) : (
-                    <TextInput
-                      style={[styles.modalFormInput, textAlignStyle]}
-                      placeholder="e.g. 14:00"
-                      value={eventEndTime}
-                      onChangeText={setEventEndTime}
-                    />
-                  )}
+                  <TimePickerInput
+                    value={eventEndTime}
+                    onChange={setEventEndTime}
+                    format={tripTimeFormat}
+                    isRTL={isRTL}
+                    placeholder="14:00"
+                  />
                 </View>
               </View>
 
@@ -1975,6 +1938,9 @@ export default function TripDashboardScreen() {
                         cursor: 'pointer'
                       }}
                     >
+                      {tripBaseCurrency && !['USD', 'ILS', 'EUR', 'GBP', 'CAD', 'AUD', 'JPY', 'CHF', 'CNY', 'NZD', 'THB', 'INR', 'AED', 'SEK', 'NOK'].includes(tripBaseCurrency) && (
+                        <option value={tripBaseCurrency}>{tripBaseCurrency}</option>
+                      )}
                       <option value="USD">USD ($)</option>
                       <option value="ILS">ILS (₪)</option>
                       <option value="EUR">EUR (€)</option>
@@ -1983,6 +1949,13 @@ export default function TripDashboardScreen() {
                       <option value="AUD">AUD ($)</option>
                       <option value="JPY">JPY (¥)</option>
                       <option value="CHF">CHF (Fr)</option>
+                      <option value="CNY">CNY (¥)</option>
+                      <option value="NZD">NZD ($)</option>
+                      <option value="THB">THB (฿)</option>
+                      <option value="INR">INR (₹)</option>
+                      <option value="AED">AED (د.إ)</option>
+                      <option value="SEK">SEK (kr)</option>
+                      <option value="NOK">NOK (kr)</option>
                     </select>
                   ) : (
                     <View style={[styles.modalFormInput, { justifyContent: 'center', backgroundColor: '#e9ecef', height: 42 }]}>
