@@ -2156,6 +2156,29 @@ export default function TripDashboardScreen() {
                         {geocodingOriginSuccessMsg}
                       </Text>
                     ) : null}
+
+                    {/* Live Map Picker for Visual Confirmation of Origin */}
+                    <View style={{ marginTop: 8 }}>
+                      <Text style={[styles.modalFormLabel, textAlignStyle, { color: colors.primary, fontWeight: 'bold', fontSize: 13 }]}>
+                        🗺️ {isRTL ? 'אישור וסימון מיקום מוצא במפה (לחץ להתאמה)' : 'Confirm Origin Location on Map (Tap pin to adjust)'}
+                      </Text>
+                      <MapPicker
+                        latitude={eventOriginLatitude ? parseFloat(eventOriginLatitude) : undefined}
+                        longitude={eventOriginLongitude ? parseFloat(eventOriginLongitude) : undefined}
+                        onSelectLocation={(lat, lon) => {
+                          setEventOriginLatitude(lat.toString());
+                          setEventOriginLongitude(lon.toString());
+                          setGeocodingOriginSuccessMsg(
+                            isRTL 
+                              ? `✓ מיקום מוצא עודכן במפה: (${lat.toFixed(4)}, ${lon.toFixed(4)})` 
+                              : `✓ Origin pinned on map: (${lat.toFixed(4)}, ${lon.toFixed(4)})`
+                          );
+                        }}
+                        lang={isRTL ? 'he' : 'en'}
+                        isRTL={isRTL}
+                        t={t}
+                      />
+                    </View>
                   </View>
 
                   {/* Destination Location Map Search */}
@@ -2202,6 +2225,29 @@ export default function TripDashboardScreen() {
                         {geocodingDestSuccessMsg}
                       </Text>
                     ) : null}
+
+                    {/* Live Map Picker for Visual Confirmation of Destination */}
+                    <View style={{ marginTop: 8 }}>
+                      <Text style={[styles.modalFormLabel, textAlignStyle, { color: colors.primary, fontWeight: 'bold', fontSize: 13 }]}>
+                        🗺️ {isRTL ? 'אישור וסימון מיקום יעד במפה (לחץ להתאמה)' : 'Confirm Destination Location on Map (Tap pin to adjust)'}
+                      </Text>
+                      <MapPicker
+                        latitude={eventLatitude ? parseFloat(eventLatitude) : undefined}
+                        longitude={eventLongitude ? parseFloat(eventLongitude) : undefined}
+                        onSelectLocation={(lat, lon) => {
+                          setEventLatitude(lat.toString());
+                          setEventLongitude(lon.toString());
+                          setGeocodingDestSuccessMsg(
+                            isRTL 
+                              ? `✓ מיקום יעד עודכן במפה: (${lat.toFixed(4)}, ${lon.toFixed(4)})` 
+                              : `✓ Destination pinned on map: (${lat.toFixed(4)}, ${lon.toFixed(4)})`
+                          );
+                        }}
+                        lang={isRTL ? 'he' : 'en'}
+                        isRTL={isRTL}
+                        t={t}
+                      />
+                    </View>
                   </View>
                 </View>
               ) : eventType === 'hotel' ? (

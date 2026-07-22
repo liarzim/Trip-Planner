@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import { StyleSheet, View, Text } from 'react-native';
 import MapView, { Marker, MapPressEvent } from 'react-native-maps';
 
@@ -19,18 +19,39 @@ export default function MapPicker({
   isRTL,
   t
 }: MapPickerProps) {
-  // Default to Jerusalem if coordinates aren't set
-  const initialLat = latitude || 31.7683;
-  const initialLon = longitude || 35.2137;
+  const mapRef = useRef<MapView>(null);
+  const currentLat = latitude || 31.7683;
+  const currentLon = longitude || 35.2137;
+
+  useEffect(() => {
+    if (latitude && longitude && mapRef.current) {
+      try {
+        if (typeof (mapRef.current as any).animateToRegion === 'function') {
+          (mapRef.current as any).animateToRegion({
+            latitude,
+            longitude,
+            latitudeDelta: 0.05,
+            longitudeDelta: 0.05,
+          }, 500);
+        }
+      } catch (e) {
+        // Fallback for web map region update
+      }
+    }
+  }, [latitude, longitude]);
 
   const handleMapPress = (e: MapPressEvent) => {
-    const { latitude: clickLat, longitude: clickLon } = e.nativeEvent.coordinate;
-    onSelectLocation(clickLat, clickLon);
+    if (e && e.nativeEvent && e.nativeEvent.coordinate) {
+      const { latitude: clickLat, longitude: clickLon } = e.nativeEvent.coordinate;
+      onSelectLocation(clickLat, clickLon);
+    }
   };
 
   const handleMarkerDragEnd = (e: any) => {
-    const { latitude: dragLat, longitude: dragLon } = e.nativeEvent.coordinate;
-    onSelectLocation(dragLat, dragLon);
+    if (e && e.nativeEvent && e.nativeEvent.coordinate) {
+      const { latitude: dragLat, longitude: dragLon } = e.nativeEvent.coordinate;
+      onSelectLocation(dragLat, dragLon);
+    }
   };
 
   return (
@@ -40,17 +61,18 @@ export default function MapPicker({
       </Text>
       <View style={styles.mapContainer}>
         <MapView
+          ref={mapRef}
           style={styles.map}
-          initialRegion={{
-            latitude: initialLat,
-            longitude: initialLon,
+          region={{
+            latitude: currentLat,
+            longitude: currentLon,
             latitudeDelta: 0.05,
             longitudeDelta: 0.05,
           }}
           onPress={handleMapPress}
         >
           <Marker
-            coordinate={{ latitude: initialLat, longitude: initialLon }}
+            coordinate={{ latitude: currentLat, longitude: currentLon }}
             draggable
             onDragEnd={handleMarkerDragEnd}
             title={t ? t('event.pin_location') : 'Event Location'}
@@ -79,6 +101,10 @@ const styles = StyleSheet.create({
     borderColor: '#ced4da',
   },
   map: {
-    ...StyleSheet.absoluteFill,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
 });
