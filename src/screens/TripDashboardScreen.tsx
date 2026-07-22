@@ -41,7 +41,8 @@ import DashboardMap from '../components/DashboardMap';
 import PackingList from '../components/PackingList';
 import { formatTimeByPreference } from '../utils/timeFormatter';
 import TimePickerInput from '../components/TimePickerInput';
-import { formatCurrencyLabel } from '../utils/currencyRegistry';
+import { formatCurrencyLabel, SUPPORTED_CURRENCIES } from '../utils/currencyRegistry';
+import { CurrencyRowItem } from '../types';
 
 type TripDashboardRouteProp = RouteProp<RootStackParamList, 'TripDashboard'>;
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'TripDashboard'>;
@@ -91,6 +92,7 @@ export default function TripDashboardScreen() {
   const [tripBaseCurrency, setTripBaseCurrency] = useState('USD');
   const [tripExchangeRate, setTripExchangeRate] = useState<number | null>(null);
   const [tripTimeFormat, setTripTimeFormat] = useState<'24h' | '12h'>('24h');
+  const [tripCurrenciesTable, setTripCurrenciesTable] = useState<CurrencyRowItem[]>([]);
 
   // Add Event Modal Form State
   const [editingEventId, setEditingEventId] = useState<string | null>(null);
@@ -276,6 +278,9 @@ export default function TripDashboardScreen() {
                 setTripExchangeRate(fetchedTrip.exchangeRateToILS);
               } else {
                 setTripExchangeRate(null);
+              }
+              if (fetchedTrip.currenciesTable && Array.isArray(fetchedTrip.currenciesTable)) {
+                setTripCurrenciesTable(fetchedTrip.currenciesTable);
               }
             }
             
@@ -1939,29 +1944,30 @@ export default function TripDashboardScreen() {
                         cursor: 'pointer'
                       }}
                     >
-                      {tripBaseCurrency && !['USD', 'ILS', 'EUR', 'GBP', 'CAD', 'AUD', 'JPY', 'CHF', 'CNY', 'NZD', 'THB', 'INR', 'AED', 'SEK', 'NOK'].includes(tripBaseCurrency) && (
-                        <option value={tripBaseCurrency}>{formatCurrencyLabel(tripBaseCurrency)}</option>
-                      )}
-                      <option value="USD">USD ($)</option>
-                      <option value="ILS">ILS (₪)</option>
-                      <option value="EUR">EUR (€)</option>
-                      <option value="GBP">GBP (£)</option>
-                      <option value="CAD">CAD ($)</option>
-                      <option value="AUD">AUD ($)</option>
-                      <option value="JPY">JPY (¥)</option>
-                      <option value="CHF">CHF (Fr)</option>
-                      <option value="CNY">CNY (¥)</option>
-                      <option value="NZD">NZD ($)</option>
-                      <option value="THB">THB (฿)</option>
-                      <option value="INR">INR (₹)</option>
-                      <option value="AED">AED (د.إ)</option>
-                      <option value="SEK">SEK (kr)</option>
-                      <option value="NOK">NOK (kr)</option>
+                      {(tripCurrenciesTable && tripCurrenciesTable.length > 0
+                        ? tripCurrenciesTable
+                        : SUPPORTED_CURRENCIES
+                      ).map((c) => (
+                        <option key={c.code} value={c.code}>
+                          {c.code} ({c.symbol})
+                        </option>
+                      ))}
+
+                      {eventCurrency &&
+                        !(
+                          tripCurrenciesTable && tripCurrenciesTable.length > 0
+                            ? tripCurrenciesTable
+                            : SUPPORTED_CURRENCIES
+                        ).some((c) => c.code.toUpperCase() === eventCurrency.toUpperCase()) && (
+                          <option value={eventCurrency}>
+                            {formatCurrencyLabel(eventCurrency, undefined, tripCurrenciesTable)}
+                          </option>
+                        )}
                     </select>
                   ) : (
                     <View style={[styles.modalFormInput, { justifyContent: 'center', backgroundColor: '#e9ecef', height: 42 }]}>
                       <Text style={{ fontWeight: 'bold', color: colors.primary, textAlign: 'center' }}>
-                        {eventCurrency}
+                        {formatCurrencyLabel(eventCurrency, undefined, tripCurrenciesTable)}
                       </Text>
                     </View>
                   )}

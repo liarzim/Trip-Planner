@@ -22,14 +22,23 @@ export const SUPPORTED_CURRENCIES: CurrencyInfo[] = [
   { code: 'NOK', symbol: 'kr', rateToILS: 0.34 },
 ];
 
-export const getCurrencySymbol = (code: string): string => {
+export const getCurrencySymbol = (code: string, currenciesTable?: CurrencyInfo[]): string => {
   if (!code) return '$';
-  const found = SUPPORTED_CURRENCIES.find(c => c.code.toUpperCase() === code.trim().toUpperCase());
+  const cleanCode = code.trim().toUpperCase();
+
+  // First check in custom trip currenciesTable if passed
+  if (currenciesTable && Array.isArray(currenciesTable)) {
+    const foundInTable = currenciesTable.find(c => c.code.toUpperCase() === cleanCode);
+    if (foundInTable && foundInTable.symbol) return foundInTable.symbol;
+  }
+
+  // Fallback to static SUPPORTED_CURRENCIES
+  const found = SUPPORTED_CURRENCIES.find(c => c.code.toUpperCase() === cleanCode);
   return found ? found.symbol : code;
 };
 
-export const formatCurrencyLabel = (code: string, symbol?: string): string => {
+export const formatCurrencyLabel = (code: string, symbol?: string, currenciesTable?: CurrencyInfo[]): string => {
   if (!code) return 'USD ($)';
-  const sym = symbol || getCurrencySymbol(code);
+  const sym = symbol || getCurrencySymbol(code, currenciesTable);
   return `${code.toUpperCase()} (${sym})`;
 };
