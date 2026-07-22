@@ -101,6 +101,7 @@ export default function TripDashboardScreen() {
   const [eventBookingReference, setEventBookingReference] = useState('');
   const [eventDescription, setEventDescription] = useState('');
   const [eventCost, setEventCost] = useState('');
+  const [eventCurrency, setEventCurrency] = useState('USD');
   const [eventSaving, setEventSaving] = useState(false);
   const [eventFormError, setEventFormError] = useState('');
 
@@ -1783,57 +1784,159 @@ export default function TripDashboardScreen() {
                 </View>
               </View>
 
-              {/* Date */}
+              {/* Date with Popup Calendar Selector */}
               <View style={{ marginBottom: 12 }}>
                 <Text style={[styles.modalFormLabel, textAlignStyle]}>
-                  {isRTL ? 'תאריך אירוע (YYYY-MM-DD) *' : 'Event Date (YYYY-MM-DD) *'}
+                  📅 {isRTL ? 'תאריך אירוע *' : 'Event Date *'}
                 </Text>
-                <TextInput
-                  style={[styles.modalFormInput, textAlignStyle]}
-                  placeholder="YYYY-MM-DD"
-                  value={eventDate}
-                  onChangeText={setEventDate}
-                />
+                {Platform.OS === 'web' ? (
+                  <input 
+                    type="date"
+                    value={eventDate}
+                    onChange={(e) => setEventDate(e.target.value)}
+                    style={{
+                      backgroundColor: '#f8f9fa',
+                      border: '1px solid #dee2e6',
+                      borderRadius: '8px',
+                      padding: '10px 12px',
+                      fontSize: '14px',
+                      fontFamily: 'inherit',
+                      width: '100%',
+                      boxSizing: 'border-box',
+                      color: '#212529',
+                      cursor: 'pointer'
+                    }}
+                  />
+                ) : (
+                  <TextInput
+                    style={[styles.modalFormInput, textAlignStyle]}
+                    placeholder="YYYY-MM-DD"
+                    value={eventDate}
+                    onChangeText={setEventDate}
+                  />
+                )}
               </View>
 
-              {/* Start & End Times */}
+              {/* Start & End Time Pickers */}
               <View style={[styles.modalFormRow, rowDirectionStyle]}>
                 <View style={[styles.modalFormCol]}>
                   <Text style={[styles.modalFormLabel, textAlignStyle]}>
-                    {isRTL ? 'שעת התחלה *' : 'Start Time *'}
+                    ⏰ {isRTL ? 'שעת התחלה *' : 'Start Time *'}
                   </Text>
-                  <TextInput
-                    style={[styles.modalFormInput, textAlignStyle]}
-                    placeholder="e.g. 10:30 AM / 22:30"
-                    value={eventStartTime}
-                    onChangeText={setEventStartTime}
-                  />
+                  {Platform.OS === 'web' ? (
+                    <input 
+                      type="time"
+                      value={eventStartTime}
+                      onChange={(e) => setEventStartTime(e.target.value)}
+                      style={{
+                        backgroundColor: '#f8f9fa',
+                        border: '1px solid #dee2e6',
+                        borderRadius: '8px',
+                        padding: '10px 12px',
+                        fontSize: '14px',
+                        fontFamily: 'inherit',
+                        width: '100%',
+                        boxSizing: 'border-box',
+                        color: '#212529',
+                        cursor: 'pointer'
+                      }}
+                    />
+                  ) : (
+                    <TextInput
+                      style={[styles.modalFormInput, textAlignStyle]}
+                      placeholder="e.g. 10:30"
+                      value={eventStartTime}
+                      onChangeText={setEventStartTime}
+                    />
+                  )}
                 </View>
                 <View style={[styles.modalFormCol]}>
                   <Text style={[styles.modalFormLabel, textAlignStyle]}>
-                    {isRTL ? 'שעת סיום' : 'End Time'}
+                    ⏰ {isRTL ? 'שעת סיום' : 'End Time'}
                   </Text>
-                  <TextInput
-                    style={[styles.modalFormInput, textAlignStyle]}
-                    placeholder="e.g. 02:00 AM / 14:00"
-                    value={eventEndTime}
-                    onChangeText={setEventEndTime}
-                  />
+                  {Platform.OS === 'web' ? (
+                    <input 
+                      type="time"
+                      value={eventEndTime}
+                      onChange={(e) => setEventEndTime(e.target.value)}
+                      style={{
+                        backgroundColor: '#f8f9fa',
+                        border: '1px solid #dee2e6',
+                        borderRadius: '8px',
+                        padding: '10px 12px',
+                        fontSize: '14px',
+                        fontFamily: 'inherit',
+                        width: '100%',
+                        boxSizing: 'border-box',
+                        color: '#212529',
+                        cursor: 'pointer'
+                      }}
+                    />
+                  ) : (
+                    <TextInput
+                      style={[styles.modalFormInput, textAlignStyle]}
+                      placeholder="e.g. 14:00"
+                      value={eventEndTime}
+                      onChangeText={setEventEndTime}
+                    />
+                  )}
                 </View>
               </View>
 
-              {/* Cost */}
-              <View style={{ marginBottom: 12 }}>
-                <Text style={[styles.modalFormLabel, textAlignStyle]}>
-                  {isRTL ? `עלות (${tripBaseCurrency})` : `Cost (${tripBaseCurrency})`}
-                </Text>
-                <TextInput
-                  style={[styles.modalFormInput, textAlignStyle]}
-                  placeholder="e.g. 100.00"
-                  value={eventCost}
-                  onChangeText={setEventCost}
-                  keyboardType="decimal-pad"
-                />
+              {/* Cost (Broken into Amount + Currency Dropdown) */}
+              <View style={[styles.modalFormRow, rowDirectionStyle]}>
+                <View style={[styles.modalFormCol, { flex: 2 }]}>
+                  <Text style={[styles.modalFormLabel, textAlignStyle]}>
+                    💰 {isRTL ? 'עלות (סכום)' : 'Cost Amount'}
+                  </Text>
+                  <TextInput
+                    style={[styles.modalFormInput, textAlignStyle]}
+                    placeholder="e.g. 100.00"
+                    value={eventCost}
+                    onChangeText={setEventCost}
+                    keyboardType="decimal-pad"
+                  />
+                </View>
+                <View style={[styles.modalFormCol, { flex: 1 }]}>
+                  <Text style={[styles.modalFormLabel, textAlignStyle]}>
+                    💱 {isRTL ? 'מטבע' : 'Currency'}
+                  </Text>
+                  {Platform.OS === 'web' ? (
+                    <select
+                      value={eventCurrency}
+                      onChange={(e) => setEventCurrency(e.target.value)}
+                      style={{
+                        backgroundColor: '#f8f9fa',
+                        border: '1px solid #dee2e6',
+                        borderRadius: '8px',
+                        padding: '10px 8px',
+                        fontSize: '14px',
+                        fontFamily: 'inherit',
+                        width: '100%',
+                        boxSizing: 'border-box',
+                        height: '42px',
+                        color: '#212529',
+                        fontWeight: 'bold',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      <option value="USD">USD ($)</option>
+                      <option value="ILS">ILS (₪)</option>
+                      <option value="EUR">EUR (€)</option>
+                      <option value="GBP">GBP (£)</option>
+                      <option value="CAD">CAD ($)</option>
+                      <option value="AUD">AUD ($)</option>
+                      <option value="JPY">JPY (¥)</option>
+                      <option value="CHF">CHF (Fr)</option>
+                    </select>
+                  ) : (
+                    <View style={[styles.modalFormInput, { justifyContent: 'center', backgroundColor: '#e9ecef', height: 42 }]}>
+                      <Text style={{ fontWeight: 'bold', color: colors.primary, textAlign: 'center' }}>
+                        {eventCurrency}
+                      </Text>
+                    </View>
+                  )}
+                </View>
               </View>
 
               {/* Booking Reference */}
@@ -1994,15 +2097,64 @@ export default function TripDashboardScreen() {
                     {isRTL ? 'פרטי מלון' : 'Hotel Details'}
                   </Text>
 
+                  {/* Address Geocoding Search Input for Hotel */}
                   <View style={{ marginBottom: 12 }}>
                     <Text style={[styles.modalFormLabel, textAlignStyle]}>
-                      {isRTL ? 'כתובת המלון (לשם פענוח מיקום במפה)' : 'Hotel Address (for Map Geocoding)'}
+                      {isRTL ? 'כתובת המלון (לחיפוש ואישור במפה)' : 'Hotel Address (to search & pin on map)'}
                     </Text>
-                    <TextInput
-                      style={[styles.modalFormInput, textAlignStyle]}
-                      placeholder={isRTL ? 'למשל: רחוב הירקון 99, תל אביב' : 'e.g. 99 Hayarkon St, Tel Aviv'}
-                      value={eventAddress}
-                      onChangeText={setEventAddress}
+                    <View style={[rowDirectionStyle, { alignItems: 'center' }]}>
+                      <TextInput
+                        style={[styles.modalFormInput, textAlignStyle, { flex: 1 }]}
+                        placeholder={isRTL ? 'למשל: רחוב הירקון 99, תל אביב' : 'e.g. 99 Hayarkon St, Tel Aviv'}
+                        value={eventAddress}
+                        onChangeText={(txt) => {
+                          setEventAddress(txt);
+                          setGeocodingSuccessMsg('');
+                        }}
+                      />
+                      <TouchableOpacity
+                        style={[
+                          styles.actionBtn,
+                          { 
+                            backgroundColor: '#2b8a3e', 
+                            paddingVertical: 10, 
+                            paddingHorizontal: 14, 
+                            marginLeft: isRTL ? 0 : 8, 
+                            marginRight: isRTL ? 8 : 0 
+                          }
+                        ]}
+                        onPress={handleFindWaypointAddressOnMap}
+                        disabled={geocodingLoading}
+                        activeOpacity={0.8}
+                      >
+                        {geocodingLoading ? (
+                          <ActivityIndicator size="small" color="#ffffff" />
+                        ) : (
+                          <Text style={[styles.actionBtnText, { color: '#ffffff', fontWeight: 'bold' }]}>
+                            🔍 {isRTL ? 'חפש במפה' : 'Find'}
+                          </Text>
+                        )}
+                      </TouchableOpacity>
+                    </View>
+                    {geocodingSuccessMsg ? (
+                      <Text style={[textAlignStyle, { color: '#2b8a3e', fontSize: 12, fontWeight: 'bold', marginTop: 4 }]}>
+                        {geocodingSuccessMsg}
+                      </Text>
+                    ) : null}
+                  </View>
+
+                  {/* Interactive Map Picker for Hotel */}
+                  <View style={{ marginBottom: 12 }}>
+                    <Text style={[styles.modalFormLabel, textAlignStyle]}>
+                      {isRTL ? 'סמן מיקום המלון על המפה' : 'Pin hotel location on map'}
+                    </Text>
+                    <MapPicker
+                      latitude={eventLatitude ? parseFloat(eventLatitude) : undefined}
+                      longitude={eventLongitude ? parseFloat(eventLongitude) : undefined}
+                      onSelectLocation={handleEventLocationSelected}
+                      lang={isRTL ? 'he' : 'en'}
+                      isRTL={isRTL}
+                      t={t}
                     />
                   </View>
 
