@@ -1101,11 +1101,18 @@ export default function TripDashboardScreen() {
 
   const safeExchangeRate = sanitizeExchangeRate(tripExchangeRate);
 
-  const totalSpent = expenses.reduce((sum, item) => {
+  const expensesTotal = expenses.reduce((sum, item) => {
     const amt = Number(item.amount);
     return sum + (isNaN(amt) || !isFinite(amt) ? 0 : amt);
   }, 0);
 
+  const eventsTotal = events.reduce((sum, item) => {
+    const amt = Number(item.cost);
+    return sum + (isNaN(amt) || !isFinite(amt) ? 0 : amt);
+  }, 0);
+
+  const totalSpent = expensesTotal + eventsTotal;
+  const totalCostCount = expenses.length + events.filter(e => typeof e.cost === 'number' && e.cost > 0).length;
   const totalSpentInILS = totalSpent * safeExchangeRate;
 
   const getEventBadgeStyle = (type: string) => {
@@ -1608,15 +1615,17 @@ export default function TripDashboardScreen() {
 
   const dashboardContent = (
     <View style={styles.dashboardContainer}>
-      {/* Total Spent Summary Card - Redesigned as Prominent Hero Card */}
+      {/* Total Spent Summary Card */}
       <View style={styles.summaryCard}>
         <Text style={styles.summaryTitle}>{t('dashboard.total_spent')}</Text>
         <Text style={styles.summaryAmount}>
-          ${totalSpent.toFixed(2)} {tripBaseCurrency || 'USD'}
+          {getCurrencySymbol(tripBaseCurrency, tripCurrenciesTable)}{totalSpent.toFixed(2)} {tripBaseCurrency || 'USD'}
           {tripExchangeRate && tripExchangeRate > 0 && tripBaseCurrency !== 'ILS' ? ` (₪${totalSpentInILS.toFixed(2)} ILS)` : ''}
         </Text>
         <Text style={styles.summarySubtitle}>
-          {t('dashboard.logged_from', { count: expenses.length.toString() })}
+          {isRTL
+            ? `מתועד מ-${totalCostCount} הוצאות ואירועים`
+            : `Logged from ${totalCostCount} expenses & event costs`}
         </Text>
       </View>
 
