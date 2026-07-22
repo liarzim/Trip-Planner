@@ -55,17 +55,31 @@ export default function MapPicker({
   };
 
   if (Platform.OS === 'web') {
-    const delta = 0.02;
-    const mapUrl = `https://www.openstreetmap.org/export/embed.html?bbox=${currentLon - delta}%2C${currentLat - delta}%2C${currentLon + delta}%2C${currentLat + delta}&layer=mapnik&marker=${currentLat}%2C${currentLon}`;
+    const googleEmbedUrl = `https://maps.google.com/maps?q=${currentLat},${currentLon}&z=14&output=embed`;
+    const googleDirectUrl = `https://www.google.com/maps?q=${currentLat},${currentLon}`;
 
     return (
       <View style={styles.container}>
-        <Text style={[styles.instruction, { textAlign: isRTL ? 'right' : 'left' }]}>
-          📍 {isRTL ? `מפת אישור מיקום: (${currentLat.toFixed(4)}, ${currentLon.toFixed(4)})` : `Location Map: (${currentLat.toFixed(4)}, ${currentLon.toFixed(4)})`}
-        </Text>
+        <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+          <Text style={[styles.instruction, { marginBottom: 0, fontWeight: 'bold', color: '#2b8a3e' }]}>
+            🗺️ {isRTL ? `מפת אישור מיקום: (${currentLat.toFixed(4)}, ${currentLon.toFixed(4)})` : `Location Map: (${currentLat.toFixed(4)}, ${currentLon.toFixed(4)})`}
+          </Text>
+          {React.createElement('a', {
+            href: googleDirectUrl,
+            target: '_blank',
+            rel: 'noopener noreferrer',
+            style: {
+              fontSize: '12px',
+              color: '#1971c2',
+              fontWeight: 'bold',
+              textDecoration: 'none',
+            }
+          }, isRTL ? '↗️ פתח במפת Google' : '↗️ Open Google Maps')}
+        </View>
+
         <View style={styles.mapContainer}>
           {React.createElement('iframe', {
-            src: mapUrl,
+            src: googleEmbedUrl,
             style: {
               width: '100%',
               height: '240px',
@@ -73,6 +87,8 @@ export default function MapPicker({
               borderRadius: '12px',
             },
             title: 'Location Map',
+            allowFullScreen: true,
+            loading: 'lazy',
           })}
         </View>
       </View>
