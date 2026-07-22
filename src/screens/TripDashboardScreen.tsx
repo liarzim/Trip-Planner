@@ -12,7 +12,8 @@ import {
   Platform,
   TextInput,
   ScrollView,
-  Image
+  Image,
+  Alert
 } from 'react-native';
 import { useRoute, useNavigation, useFocusEffect, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -21,7 +22,7 @@ import QRCode from 'react-native-qrcode-svg';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system/legacy';
 import { RootStackParamList } from '../navigation/AppNavigator';
-import { getEventsForTrip, getExpensesForTrip, getDocumentsForTrip, saveDocument, getTrip, createEvent } from '../services/dbService';
+import { getEventsForTrip, getExpensesForTrip, getDocumentsForTrip, saveDocument, getTrip, createEvent, updateEvent, deleteEvent } from '../services/dbService';
 import { uploadTripDocument } from '../services/storageService';
 import { geocodeAddress } from '../services/geocodingService';
 import { fetchRouteDirections } from '../services/directionsService';
@@ -88,6 +89,7 @@ export default function TripDashboardScreen() {
   const [tripExchangeRate, setTripExchangeRate] = useState<number | null>(null);
 
   // Add Event Modal Form State
+  const [editingEventId, setEditingEventId] = useState<string | null>(null);
   const [isAddEventModalVisible, setIsAddEventModalVisible] = useState(false);
   const [eventTitle, setEventTitle] = useState('');
   const [eventType, setEventType] = useState('flight');
@@ -438,6 +440,7 @@ export default function TripDashboardScreen() {
   };
 
   const handleOpenAddEventModal = () => {
+    setEditingEventId(null);
     setEventTitle('');
     setEventType('flight');
     setEventDate(tripStartDate || new Date().toISOString().split('T')[0]);
@@ -465,6 +468,70 @@ export default function TripDashboardScreen() {
     setGeocodingSuccessMsg('');
     setEventFormError('');
     setIsAddEventModalVisible(true);
+  };
+
+  const handleOpenEditEventModal = (item: Event) => {
+    setEditingEventId(item.id);
+    setEventTitle(item.title || '');
+    setEventType(item.type || 'waypoint');
+    const startParts = (item.startTime || '').split(' ');
+    setEventDate(startParts[0] || '');
+    setEventStartTime(startParts[1] || '10:00');
+    const endParts = (item.endTime || '').split(' ');
+    setEventEndTime(endParts[1] || '');
+    setEventLatitude(item.latitude !== undefined ? item.latitude.toString() : '');
+    setEventLongitude(item.longitude !== undefined ? item.longitude.toString() : '');
+    setEventBookingReference(item.bookingReference || '');
+    setEventDescription(item.description || '');
+    setEventAirline(item.airline || '');
+    setEventFlightNumber(item.flightNumber || '');
+    setEventDepartureTime(item.departureTime || '');
+    setEventArrivalTime(item.arrivalTime || '');
+    setEventOriginAirport(item.originAirport || '');
+    setEventDestinationAirport(item.destinationAirport || '');
+    setEventOriginLatitude(item.originLatitude !== undefined ? item.originLatitude.toString() : '');
+    setEventOriginLongitude(item.originLongitude !== undefined ? item.originLongitude.toString() : '');
+    setEventAddress(item.address || '');
+    setEventHotelUrl(item.hotelUrl || '');
+    setEventCheckInTime(item.checkInTime || '');
+    setEventCheckOutTime(item.checkOutTime || '');
+    setEventQrCodeUrl(item.qrCodeUrl || '');
+    setEventTransportMode((item.transportMode as 'driving' | 'transit') || '');
+    setEventCost(item.cost !== undefined ? item.cost.toString() : '');
+    setGeocodingSuccessMsg('');
+    setEventFormError('');
+    setIsAddEventModalVisible(true);
+  };
+
+  const handleDeleteEventItem = async (eventId: string, title: string) => {
+    const confirmMsg = isRTL 
+      ? `האם אתה בטוח שברצונך למחוק את האירוע "${title}"?`
+      : `Are you sure you want to delete "${title}"?`;
+
+    const confirmDelete = async () => {
+      try {
+        await deleteEvent(eventId);
+        const updated = await getEventsForTrip(tripId);
+        setEvents(updated);
+      } catch (err) {
+        console.error('Error deleting event:', err);
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      if (window.confirm(confirmMsg)) {
+        await confirmDelete();
+      }
+    } else {
+      Alert.alert(
+        isRTL ? 'מחיקת אירוע' : 'Delete Event',
+        confirmMsg,
+        [
+          { text: isRTL ? 'ביטול' : 'Cancel', style: 'cancel' },
+          { text: isRTL ? 'מחק' : 'Delete', style: 'destructive', onPress: confirmDelete }
+        ]
+      );
+    }
   };
 
   const handleSaveEvent = async () => {
@@ -594,37 +661,68 @@ export default function TripDashboardScreen() {
         }
       }
 
-      await createEvent(
-        tripId,
-        eventTitle.trim(),
-        eventType.toLowerCase() as 'flight' | 'hotel' | 'waypoint',
-        combinedStart,
-        combinedEnd,
-        finalLat,
-        finalLon,
-        eventBookingReference?.trim() || undefined,
-        eventDescription?.trim() || undefined,
-        eventFlightNumber.trim() || undefined,
-        eventAirline.trim() || undefined,
-        eventDepartureTime.trim() || undefined,
-        eventArrivalTime.trim() || undefined,
-        eventOriginAirport.trim().toUpperCase() || undefined,
-        eventDestinationAirport.trim().toUpperCase() || undefined,
-        eventHotelUrl.trim() || undefined,
-        eventCheckInTime.trim() || undefined,
-        eventCheckOutTime.trim() || undefined,
-        undefined,
-        undefined,
-        finalDistance,
-        finalDurationText,
-        eventQrCodeUrl.trim() || undefined,
-        eventTransportMode || undefined,
-        costVal,
-        originLatVal,
-        originLonVal,
-        eventAddress.trim() || undefined,
-        finalRoutePolyline
-      );
+      if (editingEventId) {
+        await updateEvent(editingEventId, {
+          title: eventTitle.trim(),
+          type: eventType.toLowerCase() as 'flight' | 'hotel' | 'waypoint',
+          startTime: combinedStart,
+          endTime: combinedEnd,
+          latitude: finalLat,
+          longitude: finalLon,
+          bookingReference: eventBookingReference?.trim() || undefined,
+          description: eventDescription?.trim() || undefined,
+          flightNumber: eventFlightNumber.trim() || undefined,
+          airline: eventAirline.trim() || undefined,
+          departureTime: eventDepartureTime.trim() || undefined,
+          arrivalTime: eventArrivalTime.trim() || undefined,
+          originAirport: eventOriginAirport.trim().toUpperCase() || undefined,
+          destinationAirport: eventDestinationAirport.trim().toUpperCase() || undefined,
+          hotelUrl: eventHotelUrl.trim() || undefined,
+          checkInTime: eventCheckInTime.trim() || undefined,
+          checkOutTime: eventCheckOutTime.trim() || undefined,
+          distance: finalDistance,
+          estimatedTravelTime: finalDurationText,
+          qrCodeUrl: eventQrCodeUrl.trim() || undefined,
+          transportMode: eventTransportMode || undefined,
+          cost: costVal,
+          originLatitude: originLatVal,
+          originLongitude: originLonVal,
+          address: eventAddress.trim() || undefined,
+          routePolyline: finalRoutePolyline
+        });
+      } else {
+        await createEvent(
+          tripId,
+          eventTitle.trim(),
+          eventType.toLowerCase() as 'flight' | 'hotel' | 'waypoint',
+          combinedStart,
+          combinedEnd,
+          finalLat,
+          finalLon,
+          eventBookingReference?.trim() || undefined,
+          eventDescription?.trim() || undefined,
+          eventFlightNumber.trim() || undefined,
+          eventAirline.trim() || undefined,
+          eventDepartureTime.trim() || undefined,
+          eventArrivalTime.trim() || undefined,
+          eventOriginAirport.trim().toUpperCase() || undefined,
+          eventDestinationAirport.trim().toUpperCase() || undefined,
+          eventHotelUrl.trim() || undefined,
+          eventCheckInTime.trim() || undefined,
+          eventCheckOutTime.trim() || undefined,
+          undefined,
+          undefined,
+          finalDistance,
+          finalDurationText,
+          eventQrCodeUrl.trim() || undefined,
+          eventTransportMode || undefined,
+          costVal,
+          originLatVal,
+          originLonVal,
+          eventAddress.trim() || undefined,
+          finalRoutePolyline
+        );
+      }
 
       // Refresh list
       const updatedEvents = await getEventsForTrip(tripId);
@@ -1164,6 +1262,30 @@ export default function TripDashboardScreen() {
               <Text style={[styles.actionBtnText, styles.actionBtnTextSecondary]}>🚴  {t('dashboard.komoot_map')}</Text>
             </TouchableOpacity>
           ) : null}
+
+          <TouchableOpacity 
+            style={[
+              styles.actionBtn, 
+              styles.eventEditActionBtn,
+              { marginRight: isRTL ? 0 : 8, marginLeft: isRTL ? 8 : 0 }
+            ]} 
+            onPress={() => handleOpenEditEventModal(item)}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.eventEditActionText}>✏️  {isRTL ? 'ערוך' : 'Edit'}</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={[
+              styles.actionBtn, 
+              styles.eventDeleteActionBtn,
+              { marginRight: isRTL ? 0 : 8, marginLeft: isRTL ? 8 : 0 }
+            ]} 
+            onPress={() => handleDeleteEventItem(item.id, item.title)}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.eventDeleteActionText}>🗑️  {isRTL ? 'מחק' : 'Delete'}</Text>
+          </TouchableOpacity>
         </View>
       </View>
     );
@@ -3398,5 +3520,27 @@ const styles = StyleSheet.create({
     color: colors.textLight,
     textAlign: 'center',
     fontWeight: '500',
+  },
+  eventEditActionBtn: {
+    backgroundColor: '#e7f5ff',
+    borderColor: '#a5d8ff',
+    borderWidth: 1,
+  },
+  eventEditActionText: {
+    fontFamily: typography.fontFamily,
+    fontSize: typography.sizes.xs,
+    fontWeight: typography.weights.semibold,
+    color: colors.primary,
+  },
+  eventDeleteActionBtn: {
+    backgroundColor: '#fff5f5',
+    borderColor: '#ffc9c9',
+    borderWidth: 1,
+  },
+  eventDeleteActionText: {
+    fontFamily: typography.fontFamily,
+    fontSize: typography.sizes.xs,
+    fontWeight: typography.weights.semibold,
+    color: colors.error,
   },
 });

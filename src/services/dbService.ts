@@ -520,3 +520,92 @@ export const updateTripSettings = async (
     exchangeRateToILS,
   });
 };
+
+/**
+ * Updates a trip's name, dates, and optional status in Firestore.
+ */
+export const updateTripDetails = async (
+  tripId: string,
+  name: string,
+  startDate: string,
+  endDate: string,
+  status?: string
+): Promise<void> => {
+  const tripDocRef = doc(db, 'trips', tripId);
+  const data: any = { name, startDate, endDate };
+  if (status) data.status = status;
+  await updateDoc(tripDocRef, data);
+};
+
+/**
+ * Updates the status (e.g. 'planned', 'archived', 'completed') of a trip in Firestore.
+ */
+export const updateTripStatus = async (
+  tripId: string,
+  status: 'planned' | 'archived' | 'completed'
+): Promise<void> => {
+  const tripDocRef = doc(db, 'trips', tripId);
+  await updateDoc(tripDocRef, { status });
+};
+
+/**
+ * Deletes a trip document from Firestore along with its associated events, expenses, and documents.
+ */
+export const deleteTrip = async (tripId: string): Promise<void> => {
+  // Delete associated events
+  try {
+    const eventsColl = collection(db, 'events');
+    const qEvents = query(eventsColl, where('tripId', '==', tripId));
+    const eventsSnap = await getDocs(qEvents);
+    await Promise.all(eventsSnap.docs.map((d) => deleteDoc(d.ref)));
+  } catch (err) {
+    console.error('Error deleting associated events:', err);
+  }
+
+  // Delete associated expenses
+  try {
+    const expColl = collection(db, 'expenses');
+    const qExp = query(expColl, where('tripId', '==', tripId));
+    const expSnap = await getDocs(qExp);
+    await Promise.all(expSnap.docs.map((d) => deleteDoc(d.ref)));
+  } catch (err) {
+    console.error('Error deleting associated expenses:', err);
+  }
+
+  // Delete associated documents
+  try {
+    const docsColl = collection(db, 'documents');
+    const qDocs = query(docsColl, where('tripId', '==', tripId));
+    const docsSnap = await getDocs(qDocs);
+    await Promise.all(docsSnap.docs.map((d) => deleteDoc(d.ref)));
+  } catch (err) {
+    console.error('Error deleting associated documents:', err);
+  }
+
+  // Delete the trip document itself
+  const tripDocRef = doc(db, 'trips', tripId);
+  await deleteDoc(tripDocRef);
+};
+
+/**
+ * Deletes an event document from Firestore by eventId.
+ */
+export const deleteEvent = async (eventId: string): Promise<void> => {
+  const eventDocRef = doc(db, 'events', eventId);
+  await deleteDoc(eventDocRef);
+};
+
+/**
+ * Updates an existing event document in Firestore.
+ */
+export const updateEvent = async (eventId: string, eventData: Partial<Event>): Promise<void> => {
+  const eventDocRef = doc(db, 'events', eventId);
+  const cleanData: any = {};
+  Object.keys(eventData).forEach((key) => {
+    const val = (eventData as any)[key];
+    if (val !== undefined) {
+      cleanData[key] = val;
+    }
+  });
+  await updateDoc(eventDocRef, cleanData);
+};
