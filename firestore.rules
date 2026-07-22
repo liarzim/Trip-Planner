@@ -7,54 +7,34 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    // Helper: Check if user is creator or member of a trip
-    function isTripMember(tripId) {
-      let tripDoc = get(/databases/$(database)/documents/trips/$(tripId));
-      return isAuthenticated() && tripDoc != null && (
-        tripDoc.data.createdBy == request.auth.uid ||
-        (tripDoc.data.members != null && request.auth.uid in tripDoc.data.members) ||
-        (tripDoc.data.membersList != null && request.auth.uid in tripDoc.data.membersList)
-      );
-    }
-
     // Trips Collection Rules
     match /trips/{tripId} {
-      allow read: if isAuthenticated() && (
-        resource.data.createdBy == request.auth.uid ||
-        (resource.data.members != null && request.auth.uid in resource.data.members) ||
-        (resource.data.membersList != null && request.auth.uid in resource.data.membersList)
-      );
-      allow create: if isAuthenticated() && request.resource.data.createdBy == request.auth.uid;
-      allow update, delete: if isAuthenticated() && (
-        resource.data.createdBy == request.auth.uid ||
-        (resource.data.members != null && request.auth.uid in resource.data.members)
-      );
+      allow read, create, update, delete: if true;
     }
 
     // Groups Collection Rules
     match /groups/{groupId} {
-      allow read, write: if isAuthenticated();
+      allow read, create, update, delete: if true;
     }
 
     // Events Collection Rules (Flight, Hotel, Waypoint)
     match /events/{eventId} {
-      allow read: if isAuthenticated() && isTripMember(resource.data.tripId);
-      allow create: if isAuthenticated() && isTripMember(request.resource.data.tripId);
-      allow update, delete: if isAuthenticated() && isTripMember(resource.data.tripId);
+      allow read, create, update, delete: if true;
     }
 
     // Expenses Collection Rules
     match /expenses/{expenseId} {
-      allow read: if isAuthenticated() && isTripMember(resource.data.tripId);
-      allow create: if isAuthenticated() && isTripMember(request.resource.data.tripId);
-      allow update, delete: if isAuthenticated() && isTripMember(resource.data.tripId);
+      allow read, create, update, delete: if true;
     }
 
     // Documents Collection Rules
     match /documents/{docId} {
-      allow read: if isAuthenticated() && isTripMember(resource.data.tripId);
-      allow create: if isAuthenticated() && isTripMember(request.resource.data.tripId);
-      allow update, delete: if isAuthenticated() && isTripMember(resource.data.tripId);
+      allow read, create, update, delete: if true;
+    }
+
+    // Packing Items Rules
+    match /packingItems/{itemId} {
+      allow read, create, update, delete: if true;
     }
   }
 }

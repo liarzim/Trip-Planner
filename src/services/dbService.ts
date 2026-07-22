@@ -34,7 +34,8 @@ export const createTrip = async (
   endDate: string,
   status: string,
   baseCurrency?: string,
-  exchangeRateToILS?: number
+  exchangeRateToILS?: number,
+  createdBy?: string
 ): Promise<Trip> => {
   const tripsCollection = collection(db, 'trips');
   const data: any = {
@@ -46,6 +47,7 @@ export const createTrip = async (
   };
   if (baseCurrency !== undefined) data.baseCurrency = baseCurrency;
   if (exchangeRateToILS !== undefined) data.exchangeRateToILS = exchangeRateToILS;
+  if (createdBy !== undefined) data.createdBy = createdBy;
 
   const docRef = await addDoc(tripsCollection, data);
 
@@ -73,24 +75,32 @@ export const saveTripForUser = async (
   endDate: string
 ): Promise<Trip> => {
   const groupsCollection = collection(db, 'groups');
-  const q = query(groupsCollection, where('createdBy', '==', userId));
-  const querySnapshot = await getDocs(q);
+  let querySnapshot;
+  try {
+    const q = query(groupsCollection, where('createdBy', '==', userId));
+    querySnapshot = await getDocs(q);
+  } catch (err) {
+    console.warn('[dbService] Group query failed, checking offline cache:', err);
+    try {
+      const q = query(groupsCollection, where('createdBy', '==', userId));
+      querySnapshot = await getDocsFromCache(q);
+    } catch (cErr) {
+      console.error('[dbService] Cache query for groups failed:', cErr);
+    }
+  }
 
   let groupId = '';
 
-  if (!querySnapshot.empty) {
-    // User already has a group, use the first one
+  if (querySnapshot && !querySnapshot.empty) {
     const firstGroupDoc = querySnapshot.docs[0];
     groupId = firstGroupDoc.id;
   } else {
-    // User does not belong to any group, auto-create a default group
     const defaultGroupName = 'My Travel Group';
     const newGroup = await createGroup(defaultGroupName, userId);
     groupId = newGroup.id;
   }
 
-  // Save the trip under the selected group
-  return createTrip(groupId, name, startDate, endDate, 'planned');
+  return createTrip(groupId, name, startDate, endDate, 'planned', undefined, undefined, userId);
 };
 
 /**
