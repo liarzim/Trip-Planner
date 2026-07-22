@@ -337,7 +337,40 @@ export default function TripDashboardScreen() {
           ]);
           
           if (active) {
-            setEvents(fetchedEvents);
+            // Auto-repair missing flight origin coordinates for display on main map
+            const repairedEvents = [...fetchedEvents];
+
+            for (let i = 0; i < repairedEvents.length; i++) {
+              const ev = repairedEvents[i];
+              if (ev.type.toLowerCase() === 'flight') {
+                let updatedOriginLat = ev.originLatitude;
+                let updatedOriginLon = ev.originLongitude;
+
+                if (updatedOriginLat === undefined || updatedOriginLon === undefined) {
+                  const target = ev.originAirport || ev.address || 'TLV';
+                  const coords = await geocodeAddress(target);
+                  if (coords) {
+                    updatedOriginLat = coords.latitude;
+                    updatedOriginLon = coords.longitude;
+                    repairedEvents[i] = {
+                      ...ev,
+                      originLatitude: coords.latitude,
+                      originLongitude: coords.longitude,
+                    };
+                    try {
+                      await updateEvent(ev.id, {
+                        originLatitude: coords.latitude,
+                        originLongitude: coords.longitude,
+                      });
+                    } catch (e) {
+                      console.error('Error auto-updating event origin coordinates:', e);
+                    }
+                  }
+                }
+              }
+            }
+
+            setEvents(repairedEvents);
             setExpenses(fetchedExpenses);
             setDocuments(fetchedDocs);
             if (fetchedTrip) {

@@ -135,16 +135,22 @@ export default function DashboardMap({ events, focusedEventId }: DashboardMapPro
   useEffect(() => {
     if (geoEvents.length > 0 && mapRef.current) {
       setTimeout(() => {
-        mapRef.current?.fitToCoordinates(
-          geoEvents.map((e) => ({
-            latitude: e.latitude!,
-            longitude: e.longitude!,
-          })),
-          {
-            edgePadding: { top: 50, right: 50, bottom: 50, left: 50 },
-            animated: true,
+        const allCoords: Coordinate[] = [];
+        geoEvents.forEach((e) => {
+          if (typeof e.latitude === 'number' && typeof e.longitude === 'number') {
+            allCoords.push({ latitude: e.latitude, longitude: e.longitude });
           }
-        );
+          if (e.type === 'flight' && typeof e.originLatitude === 'number' && typeof e.originLongitude === 'number') {
+            allCoords.push({ latitude: e.originLatitude, longitude: e.originLongitude });
+          }
+        });
+
+        if (allCoords.length > 0) {
+          mapRef.current?.fitToCoordinates(allCoords, {
+            edgePadding: { top: 60, right: 60, bottom: 60, left: 60 },
+            animated: true,
+          });
+        }
       }, 500);
     }
   }, [events]);
