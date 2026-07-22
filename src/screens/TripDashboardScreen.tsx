@@ -141,6 +141,15 @@ export default function TripDashboardScreen() {
   const [geocodingSuccessMsg, setGeocodingSuccessMsg] = useState('');
   const [uploadingQrImage, setUploadingQrImage] = useState(false);
 
+  // Flight Origin & Destination Geocoding States
+  const [eventOriginAddress, setEventOriginAddress] = useState('');
+  const [geocodingOriginLoading, setGeocodingOriginLoading] = useState(false);
+  const [geocodingOriginSuccessMsg, setGeocodingOriginSuccessMsg] = useState('');
+
+  const [eventDestinationAddress, setEventDestinationAddress] = useState('');
+  const [geocodingDestLoading, setGeocodingDestLoading] = useState(false);
+  const [geocodingDestSuccessMsg, setGeocodingDestSuccessMsg] = useState('');
+
   const isImageQr = (val: string | null): boolean => {
     if (!val) return false;
     return (
@@ -183,6 +192,72 @@ export default function TripDashboardScreen() {
       setEventFormError(isRTL ? 'שגיאה בפענוח הכתובת' : 'Error geocoding address');
     } finally {
       setGeocodingLoading(false);
+    }
+  };
+
+  const handleFindOriginAddressOnMap = async () => {
+    const searchTarget = eventOriginAddress.trim() || eventOriginAirport.trim();
+    if (!searchTarget) {
+      setEventFormError(isRTL ? 'אנא הזן כתובת או קוד שדה תעופה מוצא' : 'Please enter an address or airport code');
+      return;
+    }
+    setEventFormError('');
+    setGeocodingOriginLoading(true);
+    setGeocodingOriginSuccessMsg('');
+    try {
+      const coords = await geocodeAddress(searchTarget);
+      if (coords) {
+        setEventOriginLatitude(coords.latitude.toString());
+        setEventOriginLongitude(coords.longitude.toString());
+        setGeocodingOriginSuccessMsg(
+          isRTL 
+            ? `✓ מיקום מוצא פוענח וסומן במפה: (${coords.latitude.toFixed(4)}, ${coords.longitude.toFixed(4)})` 
+            : `✓ Origin pinned on map: (${coords.latitude.toFixed(4)}, ${coords.longitude.toFixed(4)})`
+        );
+      } else {
+        setEventFormError(
+          isRTL 
+            ? 'לא ניתן למצוא את מיקום המוצא במפה. נסה לחפש שם עיר או שדה תעופה.' 
+            : 'Could not locate origin on map. Try searching city or airport name.'
+        );
+      }
+    } catch (err) {
+      setEventFormError(isRTL ? 'שגיאה בפענוח מיקום מוצא' : 'Error geocoding origin location');
+    } finally {
+      setGeocodingOriginLoading(false);
+    }
+  };
+
+  const handleFindDestinationAddressOnMap = async () => {
+    const searchTarget = eventDestinationAddress.trim() || eventDestinationAirport.trim();
+    if (!searchTarget) {
+      setEventFormError(isRTL ? 'אנא הזן כתובת או קוד שדה תעופה יעד' : 'Please enter an address or airport code');
+      return;
+    }
+    setEventFormError('');
+    setGeocodingDestLoading(true);
+    setGeocodingDestSuccessMsg('');
+    try {
+      const coords = await geocodeAddress(searchTarget);
+      if (coords) {
+        setEventLatitude(coords.latitude.toString());
+        setEventLongitude(coords.longitude.toString());
+        setGeocodingDestSuccessMsg(
+          isRTL 
+            ? `✓ מיקום יעד פוענח וסומן במפה: (${coords.latitude.toFixed(4)}, ${coords.longitude.toFixed(4)})` 
+            : `✓ Destination pinned on map: (${coords.latitude.toFixed(4)}, ${coords.longitude.toFixed(4)})`
+        );
+      } else {
+        setEventFormError(
+          isRTL 
+            ? 'לא ניתן למצוא את מיקום היעד במפה. נסה לחפש שם עיר או שדה תעופה.' 
+            : 'Could not locate destination on map. Try searching city or airport name.'
+        );
+      }
+    } catch (err) {
+      setEventFormError(isRTL ? 'שגיאה בפענוח מיקום יעד' : 'Error geocoding destination location');
+    } finally {
+      setGeocodingDestLoading(false);
     }
   };
 
@@ -474,12 +549,16 @@ export default function TripDashboardScreen() {
     setEventOriginLatitude('');
     setEventOriginLongitude('');
     setEventAddress('');
+    setEventOriginAddress('');
+    setEventDestinationAddress('');
     setEventHotelUrl('');
     setEventCheckInTime('');
     setEventCheckOutTime('');
     setEventQrCodeUrl('');
     setEventTransportMode('');
     setGeocodingSuccessMsg('');
+    setGeocodingOriginSuccessMsg('');
+    setGeocodingDestSuccessMsg('');
     setEventFormError('');
     setIsAddEventModalVisible(true);
   };
@@ -503,6 +582,8 @@ export default function TripDashboardScreen() {
     setEventArrivalTime(item.arrivalTime || '');
     setEventOriginAirport(item.originAirport || '');
     setEventDestinationAirport(item.destinationAirport || '');
+    setEventOriginAddress(item.originAirport || '');
+    setEventDestinationAddress(item.destinationAirport || '');
     setEventOriginLatitude(item.originLatitude !== undefined ? item.originLatitude.toString() : '');
     setEventOriginLongitude(item.originLongitude !== undefined ? item.originLongitude.toString() : '');
     setEventAddress(item.address || '');
@@ -513,6 +594,8 @@ export default function TripDashboardScreen() {
     setEventTransportMode((item.transportMode as 'driving' | 'transit') || '');
     setEventCost(item.cost !== undefined ? item.cost.toString() : '');
     setGeocodingSuccessMsg('');
+    setGeocodingOriginSuccessMsg('');
+    setGeocodingDestSuccessMsg('');
     setEventFormError('');
     setIsAddEventModalVisible(true);
   };
@@ -2029,83 +2112,96 @@ export default function TripDashboardScreen() {
                     </View>
                   </View>
 
-                  <View style={[styles.modalFormRow, rowDirectionStyle]}>
-                    <View style={[styles.modalFormCol]}>
-                      <Text style={[styles.modalFormLabel, textAlignStyle]}>
-                        {isRTL ? 'שעת המראה' : 'Departure Time'}
-                      </Text>
+                  {/* Origin Location Map Search */}
+                  <View style={{ marginBottom: 12 }}>
+                    <Text style={[styles.modalFormLabel, textAlignStyle]}>
+                      🛫 {isRTL ? 'מיקום / שדה תעופה מוצא (לחיפוש ואישור במפה)' : 'Origin Location / Airport (search & pin on map)'}
+                    </Text>
+                    <View style={[rowDirectionStyle, { alignItems: 'center' }]}>
                       <TextInput
-                        style={[styles.modalFormInput, textAlignStyle]}
-                        placeholder="e.g. 10:30 AM"
-                        value={eventDepartureTime}
-                        onChangeText={setEventDepartureTime}
+                        style={[styles.modalFormInput, textAlignStyle, { flex: 1 }]}
+                        placeholder={isRTL ? 'למשל: Ben Gurion Airport, TLV או תל אביב' : 'e.g. Ben Gurion Airport or TLV'}
+                        value={eventOriginAddress}
+                        onChangeText={(txt) => {
+                          setEventOriginAddress(txt);
+                          setGeocodingOriginSuccessMsg('');
+                        }}
                       />
+                      <TouchableOpacity
+                        style={[
+                          styles.actionBtn,
+                          { 
+                            backgroundColor: colors.primary, 
+                            paddingVertical: 10, 
+                            paddingHorizontal: 14, 
+                            marginLeft: isRTL ? 0 : 8, 
+                            marginRight: isRTL ? 8 : 0 
+                          }
+                        ]}
+                        onPress={handleFindOriginAddressOnMap}
+                        disabled={geocodingOriginLoading}
+                        activeOpacity={0.8}
+                      >
+                        {geocodingOriginLoading ? (
+                          <ActivityIndicator color={colors.white} size="small" />
+                        ) : (
+                          <Text style={{ color: colors.white, fontWeight: 'bold', fontSize: 13 }}>
+                            🔍 {isRTL ? 'חפש מוצא' : 'Find Origin'}
+                          </Text>
+                        )}
+                      </TouchableOpacity>
                     </View>
-                    <View style={[styles.modalFormCol]}>
-                      <Text style={[styles.modalFormLabel, textAlignStyle]}>
-                        {isRTL ? 'שעת נחיתה' : 'Arrival Time'}
+                    {geocodingOriginSuccessMsg ? (
+                      <Text style={{ fontSize: 12, color: '#2b8a3e', marginTop: 4, fontWeight: 'bold', textAlign: textAlignStyle.textAlign }}>
+                        {geocodingOriginSuccessMsg}
                       </Text>
-                      <TextInput
-                        style={[styles.modalFormInput, textAlignStyle]}
-                        placeholder="e.g. 02:00 PM"
-                        value={eventArrivalTime}
-                        onChangeText={setEventArrivalTime}
-                      />
-                    </View>
+                    ) : null}
                   </View>
 
-                  <View style={[styles.modalFormRow, rowDirectionStyle]}>
-                    <View style={[styles.modalFormCol]}>
-                      <Text style={[styles.modalFormLabel, textAlignStyle]}>
-                        {isRTL ? 'קו רוחב מוצא' : 'Origin Latitude'}
-                      </Text>
+                  {/* Destination Location Map Search */}
+                  <View style={{ marginBottom: 12 }}>
+                    <Text style={[styles.modalFormLabel, textAlignStyle]}>
+                      🛬 {isRTL ? 'מיקום / שדה תעופה יעד (לחיפוש ואישור במפה)' : 'Destination Location / Airport (search & pin on map)'}
+                    </Text>
+                    <View style={[rowDirectionStyle, { alignItems: 'center' }]}>
                       <TextInput
-                        style={[styles.modalFormInput, textAlignStyle]}
-                        placeholder="e.g. 32.0094"
-                        value={eventOriginLatitude}
-                        onChangeText={setEventOriginLatitude}
-                        keyboardType="numeric"
+                        style={[styles.modalFormInput, textAlignStyle, { flex: 1 }]}
+                        placeholder={isRTL ? 'למשל: Heathrow Airport, LHR או לונדון' : 'e.g. Heathrow Airport or LHR'}
+                        value={eventDestinationAddress}
+                        onChangeText={(txt) => {
+                          setEventDestinationAddress(txt);
+                          setGeocodingDestSuccessMsg('');
+                        }}
                       />
+                      <TouchableOpacity
+                        style={[
+                          styles.actionBtn,
+                          { 
+                            backgroundColor: colors.primary, 
+                            paddingVertical: 10, 
+                            paddingHorizontal: 14, 
+                            marginLeft: isRTL ? 0 : 8, 
+                            marginRight: isRTL ? 8 : 0 
+                          }
+                        ]}
+                        onPress={handleFindDestinationAddressOnMap}
+                        disabled={geocodingDestLoading}
+                        activeOpacity={0.8}
+                      >
+                        {geocodingDestLoading ? (
+                          <ActivityIndicator color={colors.white} size="small" />
+                        ) : (
+                          <Text style={{ color: colors.white, fontWeight: 'bold', fontSize: 13 }}>
+                            🔍 {isRTL ? 'חפש יעד' : 'Find Destination'}
+                          </Text>
+                        )}
+                      </TouchableOpacity>
                     </View>
-                    <View style={[styles.modalFormCol]}>
-                      <Text style={[styles.modalFormLabel, textAlignStyle]}>
-                        {isRTL ? 'קו אורך מוצא' : 'Origin Longitude'}
+                    {geocodingDestSuccessMsg ? (
+                      <Text style={{ fontSize: 12, color: '#2b8a3e', marginTop: 4, fontWeight: 'bold', textAlign: textAlignStyle.textAlign }}>
+                        {geocodingDestSuccessMsg}
                       </Text>
-                      <TextInput
-                        style={[styles.modalFormInput, textAlignStyle]}
-                        placeholder="e.g. 34.8769"
-                        value={eventOriginLongitude}
-                        onChangeText={setEventOriginLongitude}
-                        keyboardType="numeric"
-                      />
-                    </View>
-                  </View>
-
-                  <View style={[styles.modalFormRow, rowDirectionStyle]}>
-                    <View style={[styles.modalFormCol]}>
-                      <Text style={[styles.modalFormLabel, textAlignStyle]}>
-                        {isRTL ? 'קו רוחב יעד' : 'Destination Latitude'}
-                      </Text>
-                      <TextInput
-                        style={[styles.modalFormInput, textAlignStyle]}
-                        placeholder="e.g. 51.4700"
-                        value={eventLatitude}
-                        onChangeText={setEventLatitude}
-                        keyboardType="numeric"
-                      />
-                    </View>
-                    <View style={[styles.modalFormCol]}>
-                      <Text style={[styles.modalFormLabel, textAlignStyle]}>
-                        {isRTL ? 'קו אורך יעד' : 'Destination Longitude'}
-                      </Text>
-                      <TextInput
-                        style={[styles.modalFormInput, textAlignStyle]}
-                        placeholder="e.g. -0.4543"
-                        value={eventLongitude}
-                        onChangeText={setEventLongitude}
-                        keyboardType="numeric"
-                      />
-                    </View>
+                    ) : null}
                   </View>
                 </View>
               ) : eventType === 'hotel' ? (
