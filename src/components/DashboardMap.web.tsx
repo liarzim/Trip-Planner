@@ -1,158 +1,205 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import React from 'react';
+import { StyleSheet, View, Text } from 'react-native';
 import { Event } from '../types';
-import appJson from '../../app.json';
+
+interface Coordinate {
+  latitude: number;
+  longitude: number;
+}
+
+const toRadians = (deg: number) => (deg * Math.PI) / 180;
+const toDegrees = (rad: number) => (rad * 180) / Math.PI;
+
+function getGeodesicPoints(start: Coordinate, end: Coordinate, numPoints: number = 30): Coordinate[] {
+  const points: Coordinate[] = [];
+  const lat1 = toRadians(start.latitude);
+  const lon1 = toRadians(start.longitude);
+  const lat2 = toRadians(end.latitude);
+  const lon2 = toRadians(end.longitude);
+
+  const d = 2 * Math.asin(Math.sqrt(
+    Math.pow(Math.sin((lat1 - lat2) / 2), 2) +
+    Math.cos(lat1) * Math.cos(lat2) * Math.pow(Math.sin((lon1 - lon2) / 2), 2)
+  ));
+
+  if (d === 0) {
+    return [start];
+  }
+
+  for (let i = 0; i <= numPoints; i++) {
+    const f = i / numPoints;
+    const A = Math.sin((1 - f) * d) / Math.sin(d);
+    const B = Math.sin(f * d) / Math.sin(d);
+
+    const x = A * Math.cos(lat1) * Math.cos(lon1) + B * Math.cos(lat2) * Math.cos(lon2);
+    const y = A * Math.cos(lat1) * Math.sin(lon1) + B * Math.cos(lat2) * Math.sin(lon2);
+    const z = A * Math.sin(lat1) + B * Math.sin(lat2);
+
+    const lat = Math.atan2(z, Math.sqrt(x * x + y * y));
+    const lon = Math.atan2(y, x);
+
+    points.push({
+      latitude: toDegrees(lat),
+      longitude: toDegrees(lon),
+    });
+  }
+
+  return points;
+}
 
 interface DashboardMapProps {
   events: Event[];
+  focusedEventId?: string | null;
   onClose?: () => void;
 }
 
 export default function DashboardMap({ events }: DashboardMapProps) {
-  const mapRef = useRef<HTMLDivElement>(null);
-  const [mapLoaded, setMapLoaded] = useState(false);
-  const apiKey = appJson.expo.android.config.googleMaps.apiKey;
+  const markerItems: string[] = [];
+  const arcItems: string[] = [];
 
-  // Filter events with coordinates
-  const geoEvents = events.filter(
-    (e) => typeof e.latitude === 'number' && typeof e.longitude === 'number'
-  );
+  events.forEach((item, index) => {
+    const lat = item.latitude;
+    const lon = item.longitude;
+    const isFlight = item.type.toLowerCase() === 'flight';
+    const isHotel = item.type.toLowerCase() === 'hotel';
 
-  useEffect(() => {
-    const loadScript = () => {
-      if ((window as any).google && (window as any).google.maps) {
-        setMapLoaded(true);
-        return;
-      }
-      const scriptId = 'google-maps-script';
-      let script = document.getElementById(scriptId) as HTMLScriptElement;
-      if (!script) {
-        script = document.createElement('script');
-        script.id = scriptId;
-        script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}`;
-        script.async = true;
-        script.defer = true;
-        script.onload = () => setMapLoaded(true);
-        document.head.appendChild(script);
-      } else {
-        script.addEventListener('load', () => setMapLoaded(true));
-      }
-    };
-
-    loadScript();
-  }, [apiKey]);
-
-  useEffect(() => {
-    if (!mapLoaded || !mapRef.current || geoEvents.length === 0) return;
-
-    const google = (window as any).google;
-    const center = { lat: geoEvents[0].latitude!, lng: geoEvents[0].longitude! };
-
-    const map = new google.maps.Map(mapRef.current, {
-      center,
-      zoom: 12,
-      mapTypeControl: false,
-      streetViewControl: false,
-    });
-
-    const markers: any[] = [];
-    geoEvents.forEach((item, index) => {
-      let emoji = '📍';
-      const type = item.type.toLowerCase();
-      if (type.includes('flight') || type.includes('airport')) emoji = '✈️';
-      else if (type.includes('hotel') || type.includes('accommodation') || type.includes('stay')) emoji = '🛏️';
-      else if (type.includes('trail') || type.includes('hike') || type.includes('hiking') || type.includes('sightseeing')) emoji = '🥾';
-      else if (type.includes('poi') || type.includes('museum') || type.includes('sight')) emoji = '🏛️';
-
-      // Create a marker with custom label containing the emoji
-      const marker = new google.maps.Marker({
-        position: { lat: item.latitude!, lng: item.longitude! },
-        map,
-        title: item.title,
-        label: {
-          text: emoji,
-          fontSize: '18px',
-        },
-      });
-
-      const infoWindow = new google.maps.InfoWindow({
-        content: `<div style="padding: 8px; color: #212529; font-family: sans-serif;">
-          <h4 style="margin: 0 0 4px 0; font-size: 14px;">${index + 1}. ${item.title}</h4>
-          <p style="margin: 0; font-size: 12px; color: #868e96;">${item.type.toUpperCase()} • ${item.startTime}</p>
-        </div>`,
-      });
-
-      marker.addListener('click', () => {
-        infoWindow.open(map, marker);
-      });
-
-      markers.push(marker);
-    });
-
-    // Draw route Directions on Google Maps
-    if (geoEvents.length > 1) {
-      const directionsService = new google.maps.DirectionsService();
-      const directionsRenderer = new google.maps.DirectionsRenderer({
-        map,
-        suppressMarkers: true,
-        polylineOptions: {
-          strokeColor: '#228be6',
-          strokeOpacity: 0.8,
-          strokeWeight: 4,
-        },
-      });
-
-      const origin = { lat: geoEvents[0].latitude!, lng: geoEvents[0].longitude! };
-      const destination = { lat: geoEvents[geoEvents.length - 1].latitude!, lng: geoEvents[geoEvents.length - 1].longitude! };
-      const waypoints = geoEvents.slice(1, -1).map((e) => ({
-        location: { lat: e.latitude!, lng: e.longitude! },
-        stopover: true,
-      }));
-
-      directionsService.route({
-        origin,
-        destination,
-        waypoints,
-        travelMode: google.maps.TravelMode.DRIVING,
-      }, (response: any, status: any) => {
-        if (status === 'OK') {
-          directionsRenderer.setDirections(response);
-        } else {
-          console.error('Directions request failed due to ' + status);
-        }
-      });
+    if (typeof lat === 'number' && typeof lon === 'number') {
+      const emoji = isFlight ? '🛬' : isHotel ? '🏨' : '📍';
+      const label = `${index + 1}. ${item.title.replace(/'/g, "\\'")}`;
+      
+      markerItems.push(`
+        (function() {
+          var icon = L.divIcon({
+            className: 'custom-div-icon',
+            html: '${emoji}',
+            iconSize: [32, 32],
+            iconAnchor: [16, 16]
+          });
+          var m = L.marker([${lat}, ${lon}], { icon: icon }).addTo(map);
+          m.bindPopup('<b>${label}</b><br>${item.type.toUpperCase()}');
+          bounds.push([${lat}, ${lon}]);
+        })();
+      `);
     }
 
-  }, [mapLoaded, events]);
+    if (isFlight) {
+      // Origin coordinates: fallback to Tel Aviv (32.0094, 34.8769) if missing
+      const origLat = typeof item.originLatitude === 'number' ? item.originLatitude : 32.0094;
+      const origLon = typeof item.originLongitude === 'number' ? item.originLongitude : 34.8769;
+      const destLat = typeof lat === 'number' ? lat : 50.0647;
+      const destLon = typeof lon === 'number' ? lon : 19.9450;
+
+      const origLabel = item.originAirport ? `🛫 Origin (${item.originAirport})` : '🛫 Flight Origin';
+
+      // Flight Origin Marker
+      markerItems.push(`
+        (function() {
+          var icon = L.divIcon({
+            className: 'custom-div-icon origin-icon',
+            html: '🛫',
+            iconSize: [32, 32],
+            iconAnchor: [16, 16]
+          });
+          var m = L.marker([${origLat}, ${origLon}], { icon: icon }).addTo(map);
+          m.bindPopup('<b>${origLabel}</b>');
+          bounds.push([${origLat}, ${origLon}]);
+        })();
+      `);
+
+      // Flight Arc Line
+      const arcPoints = getGeodesicPoints(
+        { latitude: origLat, longitude: origLon },
+        { latitude: destLat, longitude: destLon },
+        40
+      );
+
+      const latLngArray = JSON.stringify(arcPoints.map(p => [p.latitude, p.longitude]));
+
+      arcItems.push(`
+        (function() {
+          var line = L.polyline(${latLngArray}, {
+            color: '#e222b6',
+            weight: 4,
+            dashArray: '8, 8',
+            opacity: 0.95
+          }).addTo(map);
+        })();
+      `);
+    }
+  });
+
+  const mapHtml = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8" />
+      <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+      <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+      <style>
+        html, body, #map { margin: 0; padding: 0; width: 100%; height: 100%; background: #e9ecef; }
+        .custom-div-icon {
+          font-size: 18px;
+          text-align: center;
+          line-height: 28px;
+          background: white;
+          border: 2px solid #1971c2;
+          border-radius: 50%;
+          box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+        }
+        .origin-icon {
+          border-color: #e222b6;
+        }
+      </style>
+    </head>
+    <body>
+      <div id="map"></div>
+      <script>
+        var map = L.map('map');
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 18,
+          attribution: '© OpenStreetMap'
+        }).addTo(map);
+
+        var bounds = [];
+
+        ${markerItems.join('\n')}
+        ${arcItems.join('\n')}
+
+        if (bounds.length > 0) {
+          map.fitBounds(bounds, { padding: [50, 50] });
+        } else {
+          map.setView([32.0094, 34.8769], 4);
+        }
+      </script>
+    </body>
+    </html>
+  `;
 
   return (
     <View style={styles.container}>
-      {geoEvents.length === 0 ? (
-        <View style={styles.emptyContainer}>
-          <Text style={styles.emptyText}>No geotagged events found</Text>
-        </View>
-      ) : (
-        <div ref={mapRef} style={{ width: '100%', height: '100%', borderRadius: 12 }} />
-      )}
+      {React.createElement('iframe', {
+        srcDoc: mapHtml,
+        style: {
+          width: '100%',
+          height: '350px',
+          border: 'none',
+          borderRadius: '16px',
+        },
+        title: 'Trip Main Map',
+      })}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    height: '100%',
+    height: 350,
     width: '100%',
-  },
-  emptyContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#f8f9fa',
-    height: '100%',
-  },
-  emptyText: {
-    color: '#868e96',
-    fontSize: 14,
+    borderRadius: 16,
+    overflow: 'hidden',
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#ced4da',
+    backgroundColor: '#e9ecef',
   },
 });
