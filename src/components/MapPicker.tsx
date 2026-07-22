@@ -1,5 +1,5 @@
 import React, { useRef, useEffect } from 'react';
-import { StyleSheet, View, Text } from 'react-native';
+import { StyleSheet, View, Text, Platform } from 'react-native';
 import MapView, { Marker, MapPressEvent } from 'react-native-maps';
 
 interface MapPickerProps {
@@ -24,7 +24,7 @@ export default function MapPicker({
   const currentLon = longitude || 35.2137;
 
   useEffect(() => {
-    if (latitude && longitude && mapRef.current) {
+    if (latitude && longitude && mapRef.current && Platform.OS !== 'web') {
       try {
         if (typeof (mapRef.current as any).animateToRegion === 'function') {
           (mapRef.current as any).animateToRegion({
@@ -35,7 +35,7 @@ export default function MapPicker({
           }, 500);
         }
       } catch (e) {
-        // Fallback for web map region update
+        // Fallback
       }
     }
   }, [latitude, longitude]);
@@ -53,6 +53,31 @@ export default function MapPicker({
       onSelectLocation(dragLat, dragLon);
     }
   };
+
+  if (Platform.OS === 'web') {
+    const delta = 0.02;
+    const mapUrl = `https://www.openstreetmap.org/export/embed.html?bbox=${currentLon - delta}%2C${currentLat - delta}%2C${currentLon + delta}%2C${currentLat + delta}&layer=mapnik&marker=${currentLat}%2C${currentLon}`;
+
+    return (
+      <View style={styles.container}>
+        <Text style={[styles.instruction, { textAlign: isRTL ? 'right' : 'left' }]}>
+          📍 {isRTL ? `מפת אישור מיקום: (${currentLat.toFixed(4)}, ${currentLon.toFixed(4)})` : `Location Map: (${currentLat.toFixed(4)}, ${currentLon.toFixed(4)})`}
+        </Text>
+        <View style={styles.mapContainer}>
+          {React.createElement('iframe', {
+            src: mapUrl,
+            style: {
+              width: '100%',
+              height: '240px',
+              border: 'none',
+              borderRadius: '12px',
+            },
+            title: 'Location Map',
+          })}
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
