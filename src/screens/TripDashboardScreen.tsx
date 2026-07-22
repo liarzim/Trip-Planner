@@ -498,6 +498,19 @@ export default function TripDashboardScreen() {
 
   // Deep Link Navigation with Komoot (with Google Maps fallback)
   const handleNavigateKomoot = async (lat: number, lon: number) => {
+    if (Platform.OS === 'web') {
+      // On web browser, open Komoot Web interactive trail planner in a new tab
+      const webUrl = `https://www.komoot.com/plan/@${lat},${lon},14z`;
+      if (typeof window !== 'undefined') {
+        window.open(webUrl, '_blank');
+      } else {
+        Linking.openURL(webUrl).catch(() => {
+          Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${lat},${lon}`);
+        });
+      }
+      return;
+    }
+
     const komootUrl = `komoot://tour?lat=${lat}&lon=${lon}`;
     const googleMapsUrl = `https://www.google.com/maps/search/?api=1&query=${lat},${lon}`;
 
