@@ -11,7 +11,8 @@ import {
   Modal,
   Platform,
   TextInput,
-  ScrollView
+  ScrollView,
+  Image
 } from 'react-native';
 import { useRoute, useNavigation, useFocusEffect, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -124,6 +125,83 @@ export default function TripDashboardScreen() {
   const [selectedQrCodeVal, setSelectedQrCodeVal] = useState<string | null>(null);
   const [eventQrCodeUrl, setEventQrCodeUrl] = useState('');
   const [eventTransportMode, setEventTransportMode] = useState<'driving' | 'transit' | ''>('');
+  const [geocodingLoading, setGeocodingLoading] = useState(false);
+  const [geocodingSuccessMsg, setGeocodingSuccessMsg] = useState('');
+  const [uploadingQrImage, setUploadingQrImage] = useState(false);
+
+  const isImageQr = (val: string | null): boolean => {
+    if (!val) return false;
+    return (
+      val.startsWith('data:image/') ||
+      val.startsWith('http://') ||
+      val.startsWith('https://') ||
+      val.startsWith('file://') ||
+      val.startsWith('ph://') ||
+      val.startsWith('content://') ||
+      /\.(jpg|jpeg|png|gif|webp)$/i.test(val)
+    );
+  };
+
+  const handleFindWaypointAddressOnMap = async () => {
+    if (!eventAddress.trim()) {
+      setEventFormError(isRTL ? 'אנא הזן כתובת לפני החיפוש' : 'Please enter an address before searching');
+      return;
+    }
+    setEventFormError('');
+    setGeocodingLoading(true);
+    setGeocodingSuccessMsg('');
+    try {
+      const coords = await geocodeAddress(eventAddress.trim());
+      if (coords) {
+        setEventLatitude(coords.latitude.toString());
+        setEventLongitude(coords.longitude.toString());
+        setGeocodingSuccessMsg(
+          isRTL 
+            ? '✓ המיקום פוענח בהצלחה וסומן על המפה למטה' 
+            : '✓ Address found! Location pinned on map below for approval.'
+        );
+      } else {
+        setEventFormError(
+          isRTL 
+            ? 'לא ניתן למצוא את הכתובת במפה. אנא בדוק אותה או סמן ידנית על המפה.' 
+            : 'Could not locate address on map. Please check spelling or pin location manually.'
+        );
+      }
+    } catch (err) {
+      setEventFormError(isRTL ? 'שגיאה בפענוח הכתובת' : 'Error geocoding address');
+    } finally {
+      setGeocodingLoading(false);
+    }
+  };
+
+  const handlePickQrImage = async () => {
+    try {
+      const result = await getDocumentAsync({
+        type: 'image/*',
+        copyToCacheDirectory: true,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const file = result.assets[0];
+        setUploadingQrImage(true);
+
+        try {
+          const base64 = await FileSystem.readAsStringAsync(file.uri, {
+            encoding: FileSystem.EncodingType.Base64,
+          });
+          const mimeType = file.mimeType || 'image/jpeg';
+          const dataUri = `data:${mimeType};base64,${base64}`;
+          setEventQrCodeUrl(dataUri);
+        } catch (readErr) {
+          setEventQrCodeUrl(file.uri);
+        }
+      }
+    } catch (err) {
+      console.error('Error picking QR image:', err);
+    } finally {
+      setUploadingQrImage(false);
+    }
+  };
 
   const toggleHotelAccordion = (id: string) => {
     setExpandedHotelIds((prev) => ({
@@ -380,6 +458,7 @@ export default function TripDashboardScreen() {
     setEventCheckOutTime('');
     setEventQrCodeUrl('');
     setEventTransportMode('');
+    setGeocodingSuccessMsg('');
     setEventFormError('');
     setIsAddEventModalVisible(true);
   };
@@ -452,7 +531,7 @@ export default function TripDashboardScreen() {
       let finalLat = latVal;
       let finalLon = lonVal;
 
-      if (eventType.toLowerCase() === 'hotel' && eventAddress.trim() && latVal === undefined && lonVal === undefined) {
+      if ((eventType.toLowerCase() === 'hotel' || eventType.toLowerCase() === 'waypoint') && eventAddress.trim() && latVal === undefined && lonVal === undefined) {
         try {
           const coords = await geocodeAddress(eventAddress.trim());
           if (coords) {
@@ -1400,7 +1479,11 @@ export default function TripDashboardScreen() {
             <Text style={styles.modalSubtitle}>Scan at boarding terminal or reception desk</Text>
             {selectedBookingRef ? (
               <View style={styles.qrWrapper}>
-                <QRCode value={selectedBookingRef} size={180} />
+                {isImageQr(selectedBookingRef) ? (
+                  <Image source={{ uri: selectedBookingRef }} style={{ width: 220, height: 220, resizeMode: 'contain' }} />
+                ) : (
+                  <QRCode value={selectedBookingRef} size={180} />
+                )}
               </View>
             ) : null}
             <Text style={styles.bookingRefText}>REF: {selectedBookingRef}</Text>
@@ -1431,7 +1514,11 @@ export default function TripDashboardScreen() {
             <Text style={styles.fullScreenQrTitle}>{isRTL ? 'קוד QR של נקודת הציון' : 'Waypoint QR Code'}</Text>
             {selectedQrCodeVal ? (
               <View style={styles.fullScreenQrWrapper}>
-                <QRCode value={selectedQrCodeVal} size={240} />
+                {isImageQr(selectedQrCodeVal) ? (
+                  <Image source={{ uri: selectedQrCodeVal }} style={{ width: 250, height: 250, resizeMode: 'contain' }} />
+                ) : (
+                  <QRCode value={selectedQrCodeVal} size={240} />
+                )}
               </View>
             ) : null}
             <TouchableOpacity 
@@ -1819,16 +1906,101 @@ export default function TripDashboardScreen() {
                     {isRTL ? 'פרטי נקודת ציון' : 'Waypoint Details'}
                   </Text>
 
+                  {/* Address Geocoding Search Input */}
                   <View style={{ marginBottom: 12 }}>
                     <Text style={[styles.modalFormLabel, textAlignStyle]}>
-                      {isRTL ? 'ערך קוד QR (אופציונלי)' : 'QR Code Value / URL (Optional)'}
+                      {isRTL ? 'כתובת המיקום / מקום (לחיפוש ואישור במפה)' : 'Location Address (to search & pin on map)'}
                     </Text>
-                    <TextInput
-                      style={[styles.modalFormInput, textAlignStyle]}
-                      placeholder={isRTL ? 'למשל: פרטי כרטיס או קישור' : 'e.g. ticket details or QR URL'}
-                      value={eventQrCodeUrl}
-                      onChangeText={setEventQrCodeUrl}
-                    />
+                    <View style={[rowDirectionStyle, { alignItems: 'center' }]}>
+                      <TextInput
+                        style={[styles.modalFormInput, textAlignStyle, { flex: 1 }]}
+                        placeholder={isRTL ? 'למשל: מגדל אייפל, פריז' : 'e.g. Eiffel Tower, Paris'}
+                        value={eventAddress}
+                        onChangeText={(txt) => {
+                          setEventAddress(txt);
+                          setGeocodingSuccessMsg('');
+                        }}
+                      />
+                      <TouchableOpacity
+                        style={[
+                          styles.actionBtn,
+                          { 
+                            backgroundColor: colors.primary, 
+                            paddingVertical: 10, 
+                            paddingHorizontal: 14, 
+                            marginLeft: isRTL ? 0 : 8, 
+                            marginRight: isRTL ? 8 : 0 
+                          }
+                        ]}
+                        onPress={handleFindWaypointAddressOnMap}
+                        disabled={geocodingLoading}
+                        activeOpacity={0.8}
+                      >
+                        {geocodingLoading ? (
+                          <ActivityIndicator size="small" color="#ffffff" />
+                        ) : (
+                          <Text style={[styles.actionBtnText, { color: '#ffffff', fontWeight: 'bold' }]}>
+                            🔍 {isRTL ? 'חפש במפה' : 'Find'}
+                          </Text>
+                        )}
+                      </TouchableOpacity>
+                    </View>
+                    {geocodingSuccessMsg ? (
+                      <Text style={[textAlignStyle, { color: '#2b8a3e', fontSize: 12, fontWeight: 'bold', marginTop: 4 }]}>
+                        {geocodingSuccessMsg}
+                      </Text>
+                    ) : null}
+                  </View>
+
+                  {/* QR Code Text / URL or Image Upload */}
+                  <View style={{ marginBottom: 12 }}>
+                    <Text style={[styles.modalFormLabel, textAlignStyle]}>
+                      {isRTL ? 'ערך קוד QR או תמונת QR' : 'QR Code Value, Link or Picture'}
+                    </Text>
+                    <View style={[rowDirectionStyle, { alignItems: 'center', marginBottom: 6 }]}>
+                      <TextInput
+                        style={[styles.modalFormInput, textAlignStyle, { flex: 1 }]}
+                        placeholder={isRTL ? 'הזן טקסט/קישור או העלה תמונה' : 'Enter text/URL or upload image'}
+                        value={isImageQr(eventQrCodeUrl) ? (isRTL ? '[תמונת QR הועלתה]' : '[QR Image Uploaded]') : eventQrCodeUrl}
+                        onChangeText={setEventQrCodeUrl}
+                      />
+                      <TouchableOpacity
+                        style={[
+                          styles.actionBtn,
+                          { 
+                            backgroundColor: '#fff3bf', 
+                            borderColor: '#ffd43b', 
+                            borderWidth: 1,
+                            paddingVertical: 10, 
+                            paddingHorizontal: 12, 
+                            marginLeft: isRTL ? 0 : 8, 
+                            marginRight: isRTL ? 8 : 0 
+                          }
+                        ]}
+                        onPress={handlePickQrImage}
+                        disabled={uploadingQrImage}
+                        activeOpacity={0.8}
+                      >
+                        {uploadingQrImage ? (
+                          <ActivityIndicator size="small" color="#e67700" />
+                        ) : (
+                          <Text style={[styles.actionBtnText, { color: '#e67700', fontWeight: 'bold' }]}>
+                            📷 {isRTL ? 'העלה תמונה' : 'Upload Image'}
+                          </Text>
+                        )}
+                      </TouchableOpacity>
+                    </View>
+
+                    {isImageQr(eventQrCodeUrl) && (
+                      <View style={{ alignItems: 'center', marginVertical: 6, backgroundColor: '#f8f9fa', padding: 8, borderRadius: 8 }}>
+                        <Image source={{ uri: eventQrCodeUrl }} style={{ width: 100, height: 100, resizeMode: 'contain' }} />
+                        <TouchableOpacity onPress={() => setEventQrCodeUrl('')}>
+                          <Text style={{ color: '#e03131', fontSize: 12, marginTop: 4, fontWeight: 'bold' }}>
+                            🗑️ {isRTL ? 'הסר תמונה' : 'Remove Image'}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
                   </View>
 
                   <View style={{ marginBottom: 12 }}>
