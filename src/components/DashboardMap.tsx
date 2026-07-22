@@ -233,8 +233,6 @@ export default function DashboardMap({ events, focusedEventId }: DashboardMapPro
         {geoEvents.map((item) => {
           if (item.type === 'flight' && typeof item.originLatitude === 'number' && typeof item.originLongitude === 'number') {
             const isSelected = selectedEventId === item.id;
-            if (!isSelected) return null;
-
             const start = { latitude: item.originLatitude, longitude: item.originLongitude };
             const end = { latitude: item.latitude!, longitude: item.longitude! };
             const geodesicPoints = getGeodesicPoints(start, end, 30);

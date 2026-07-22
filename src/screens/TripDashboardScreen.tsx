@@ -698,6 +698,40 @@ export default function TripDashboardScreen() {
     try {
       let finalLat = latVal;
       let finalLon = lonVal;
+      let finalOriginLat = originLatVal;
+      let finalOriginLon = originLonVal;
+
+      if (eventType.toLowerCase() === 'flight') {
+        if (finalOriginLat === undefined || finalOriginLon === undefined) {
+          const originTarget = eventOriginAddress.trim() || eventOriginAirport.trim();
+          if (originTarget) {
+            try {
+              const coords = await geocodeAddress(originTarget);
+              if (coords) {
+                finalOriginLat = coords.latitude;
+                finalOriginLon = coords.longitude;
+              }
+            } catch (geocodeErr) {
+              console.error('Error auto-geocoding flight origin:', geocodeErr);
+            }
+          }
+        }
+
+        if (finalLat === undefined || finalLon === undefined) {
+          const destTarget = eventDestinationAddress.trim() || eventDestinationAirport.trim();
+          if (destTarget) {
+            try {
+              const coords = await geocodeAddress(destTarget);
+              if (coords) {
+                finalLat = coords.latitude;
+                finalLon = coords.longitude;
+              }
+            } catch (geocodeErr) {
+              console.error('Error auto-geocoding flight destination:', geocodeErr);
+            }
+          }
+        }
+      }
 
       if ((eventType.toLowerCase() === 'hotel' || eventType.toLowerCase() === 'waypoint') && eventAddress.trim() && latVal === undefined && lonVal === undefined) {
         try {
@@ -782,8 +816,8 @@ export default function TripDashboardScreen() {
           qrCodeUrl: eventQrCodeUrl.trim() || undefined,
           transportMode: eventTransportMode || undefined,
           cost: costVal,
-          originLatitude: originLatVal,
-          originLongitude: originLonVal,
+          originLatitude: finalOriginLat,
+          originLongitude: finalOriginLon,
           address: eventAddress.trim() || undefined,
           routePolyline: finalRoutePolyline
         });
@@ -814,8 +848,8 @@ export default function TripDashboardScreen() {
           eventQrCodeUrl.trim() || undefined,
           eventTransportMode || undefined,
           costVal,
-          originLatVal,
-          originLonVal,
+          finalOriginLat,
+          finalOriginLon,
           eventAddress.trim() || undefined,
           finalRoutePolyline
         );
