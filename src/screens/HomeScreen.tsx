@@ -23,6 +23,7 @@ import { colors } from '../theme/colors';
 import { typography } from '../theme/typography';
 import { useTranslation } from '../services/translationService';
 import LanguageSelector from '../components/LanguageSelector';
+import DatePickerInput from '../components/DatePickerInput';
 
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'Home'>;
 
@@ -341,19 +342,19 @@ export default function HomeScreen() {
             />
 
             <Text style={[styles.inputLabel, textAlignStyle]}>{isRTL ? 'תאריך התחלה (YYYY-MM-DD)' : 'Start Date (YYYY-MM-DD)'}</Text>
-            <TextInput 
-              style={[styles.input, textAlignStyle]}
+            <DatePickerInput
               value={editStartDate}
-              onChangeText={setEditStartDate}
+              onChange={setEditStartDate}
               placeholder="2026-08-01"
+              isRTL={isRTL}
             />
 
             <Text style={[styles.inputLabel, textAlignStyle]}>{isRTL ? 'תאריך סיום (YYYY-MM-DD)' : 'End Date (YYYY-MM-DD)'}</Text>
-            <TextInput 
-              style={[styles.input, textAlignStyle]}
+            <DatePickerInput
               value={editEndDate}
-              onChangeText={setEditEndDate}
+              onChange={setEditEndDate}
               placeholder="2026-08-10"
+              isRTL={isRTL}
             />
 
             <View style={[styles.modalActionsRow, rowDirectionStyle]}>

@@ -41,6 +41,7 @@ import DashboardMap from '../components/DashboardMap';
 import PackingList from '../components/PackingList';
 import { formatTimeByPreference } from '../utils/timeFormatter';
 import TimePickerInput from '../components/TimePickerInput';
+import DatePickerInput from '../components/DatePickerInput';
 import { formatCurrencyLabel, SUPPORTED_CURRENCIES } from '../utils/currencyRegistry';
 import { CurrencyRowItem } from '../types';
 
@@ -1847,36 +1848,17 @@ export default function TripDashboardScreen() {
               </View>
 
               {/* Date with Popup Calendar Selector */}
-              <View style={{ marginBottom: 12 }}>
+              {/* Event Date Input using DatePickerInput */}
+              <View style={{ marginBottom: 4 }}>
                 <Text style={[styles.modalFormLabel, textAlignStyle]}>
                   📅 {isRTL ? 'תאריך אירוע *' : 'Event Date *'}
                 </Text>
-                {Platform.OS === 'web' ? (
-                  <input 
-                    type="date"
-                    value={eventDate}
-                    onChange={(e) => setEventDate(e.target.value)}
-                    style={{
-                      backgroundColor: '#f8f9fa',
-                      border: '1px solid #dee2e6',
-                      borderRadius: '8px',
-                      padding: '10px 12px',
-                      fontSize: '14px',
-                      fontFamily: 'inherit',
-                      width: '100%',
-                      boxSizing: 'border-box',
-                      color: '#212529',
-                      cursor: 'pointer'
-                    }}
-                  />
-                ) : (
-                  <TextInput
-                    style={[styles.modalFormInput, textAlignStyle]}
-                    placeholder="YYYY-MM-DD"
-                    value={eventDate}
-                    onChangeText={setEventDate}
-                  />
-                )}
+                <DatePickerInput
+                  value={eventDate}
+                  onChange={setEventDate}
+                  placeholder="YYYY-MM-DD"
+                  isRTL={isRTL}
+                />
               </View>
 
               {/* Start & End Time Pickers conforming strictly to tripTimeFormat */}
