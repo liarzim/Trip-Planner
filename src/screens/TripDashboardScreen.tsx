@@ -101,6 +101,7 @@ export default function TripDashboardScreen() {
   const [eventTitle, setEventTitle] = useState('');
   const [eventType, setEventType] = useState('flight');
   const [eventDate, setEventDate] = useState('');
+  const [eventEndDate, setEventEndDate] = useState('');
   const [eventStartTime, setEventStartTime] = useState('');
   const [eventEndTime, setEventEndTime] = useState('');
   const [eventLatitude, setEventLatitude] = useState('');
@@ -565,7 +566,9 @@ export default function TripDashboardScreen() {
     setEditingEventId(null);
     setEventTitle('');
     setEventType('flight');
-    setEventDate(tripStartDate || new Date().toISOString().split('T')[0]);
+    const initialDate = tripStartDate || new Date().toISOString().split('T')[0];
+    setEventDate(initialDate);
+    setEventEndDate(initialDate);
     setEventStartTime('');
     setEventEndTime('');
     setEventLatitude('');
@@ -604,6 +607,7 @@ export default function TripDashboardScreen() {
     setEventDate(startParts[0] || '');
     setEventStartTime(startParts[1] || '10:00');
     const endParts = (item.endTime || '').split(' ');
+    setEventEndDate(endParts[0] || startParts[0] || '');
     setEventEndTime(endParts[1] || '');
     setEventLatitude(item.latitude !== undefined ? item.latitude.toString() : '');
     setEventLongitude(item.longitude !== undefined ? item.longitude.toString() : '');
@@ -781,15 +785,26 @@ export default function TripDashboardScreen() {
         }
       }
 
-      let endEventDate = eventDate;
+      if (eventEndDate && eventEndDate < eventDate) {
+        setEventFormError(
+          isRTL
+            ? 'תאריך הסיום אינו יכול להיות מוקדם מתאריך ההתחלה'
+            : 'End date cannot be earlier than start date'
+        );
+        return;
+      }
+
+      let endEventDate = eventEndDate.trim() || eventDate.trim();
       const startMin = parseTimeToMinutes(eventStartTime);
       const endMin = parseTimeToMinutes(eventEndTime);
-      if (startMin !== null && endMin !== null && endMin < startMin) {
+      if (startMin !== null && endMin !== null && endMin < startMin && endEventDate === eventDate) {
         endEventDate = addDayToDateStr(eventDate);
       }
 
       const combinedStart = `${eventDate} ${eventStartTime}`;
       const combinedEnd = eventEndTime ? `${endEventDate} ${eventEndTime}` : '';
+      const finalCheckInTime = eventType.toLowerCase() === 'hotel' ? eventStartTime.trim() : eventCheckInTime.trim();
+      const finalCheckOutTime = eventType.toLowerCase() === 'hotel' ? eventEndTime.trim() : eventCheckOutTime.trim();
 
       let finalDistance: number | undefined = undefined;
       let finalDurationText: string | undefined = undefined;
@@ -845,8 +860,8 @@ export default function TripDashboardScreen() {
           originAirport: eventOriginAirport.trim().toUpperCase() || undefined,
           destinationAirport: eventDestinationAirport.trim().toUpperCase() || undefined,
           hotelUrl: eventHotelUrl.trim() || undefined,
-          checkInTime: eventCheckInTime.trim() || undefined,
-          checkOutTime: eventCheckOutTime.trim() || undefined,
+          checkInTime: finalCheckInTime || undefined,
+          checkOutTime: finalCheckOutTime || undefined,
           distance: finalDistance,
           estimatedTravelTime: finalDurationText,
           qrCodeUrl: eventQrCodeUrl.trim() || undefined,
@@ -875,8 +890,8 @@ export default function TripDashboardScreen() {
           eventOriginAirport.trim().toUpperCase() || undefined,
           eventDestinationAirport.trim().toUpperCase() || undefined,
           eventHotelUrl.trim() || undefined,
-          eventCheckInTime.trim() || undefined,
-          eventCheckOutTime.trim() || undefined,
+          finalCheckInTime || undefined,
+          finalCheckOutTime || undefined,
           undefined,
           undefined,
           finalDistance,
@@ -2000,47 +2015,102 @@ export default function TripDashboardScreen() {
                 </View>
               </View>
 
-              {/* Date with Popup Calendar Selector */}
-              {/* Event Date Input using DatePickerInput */}
-              <View style={{ marginBottom: 4 }}>
-                <Text style={[styles.modalFormLabel, textAlignStyle]}>
-                  📅 {isRTL ? 'תאריך אירוע *' : 'Event Date *'}
-                </Text>
-                <DatePickerInput
-                  value={eventDate}
-                  onChange={setEventDate}
-                  placeholder="YYYY-MM-DD"
-                  isRTL={isRTL}
-                />
-              </View>
+              {/* Dynamic Header Labels Based on Event Type */}
+              {(() => {
+                let startDateLabel = `📅 ${isRTL ? 'תאריך התחלה *' : 'Start Date *'}`;
+                let endDateLabel = `📅 ${isRTL ? 'תאריך סיום' : 'End Date'}`;
+                let startTimeLabel = `⏰ ${isRTL ? 'שעת התחלה *' : 'Start Time *'}`;
+                let endTimeLabel = `⏰ ${isRTL ? 'שעת סיום' : 'End Time'}`;
 
-              {/* Start & End Time Pickers conforming strictly to tripTimeFormat */}
-              <View style={[styles.modalFormRow, rowDirectionStyle]}>
-                <View style={[styles.modalFormCol]}>
-                  <Text style={[styles.modalFormLabel, textAlignStyle]}>
-                    ⏰ {isRTL ? 'שעת התחלה *' : 'Start Time *'}
-                  </Text>
-                  <TimePickerInput
-                    value={eventStartTime}
-                    onChange={setEventStartTime}
-                    format={tripTimeFormat}
-                    isRTL={isRTL}
-                    placeholder="10:30"
-                  />
-                </View>
-                <View style={[styles.modalFormCol]}>
-                  <Text style={[styles.modalFormLabel, textAlignStyle]}>
-                    ⏰ {isRTL ? 'שעת סיום' : 'End Time'}
-                  </Text>
-                  <TimePickerInput
-                    value={eventEndTime}
-                    onChange={setEventEndTime}
-                    format={tripTimeFormat}
-                    isRTL={isRTL}
-                    placeholder="14:00"
-                  />
-                </View>
-              </View>
+                if (eventType === 'hotel') {
+                  startDateLabel = `📅 ${isRTL ? 'תאריך צ\'ק-אין *' : 'Check-In Date *'}`;
+                  endDateLabel = `📅 ${isRTL ? 'תאריך צ\'ק-אאוט' : 'Check-Out Date'}`;
+                  startTimeLabel = `⏰ ${isRTL ? 'שעת צ\'ק-אין *' : 'Check-In Time *'}`;
+                  endTimeLabel = `⏰ ${isRTL ? 'שעת צ\'ק-אאוט' : 'Check-Out Time'}`;
+                } else if (eventType === 'flight') {
+                  startDateLabel = `📅 ${isRTL ? 'תאריך המראה *' : 'Departure Date *'}`;
+                  endDateLabel = `📅 ${isRTL ? 'תאריך נחיתה' : 'Arrival Date'}`;
+                  startTimeLabel = `⏰ ${isRTL ? 'שעת המראה *' : 'Departure Time *'}`;
+                  endTimeLabel = `⏰ ${isRTL ? 'שעת נחיתה' : 'Arrival Time'}`;
+                }
+
+                return (
+                  <>
+                    {/* Start & End Dates with Popup Calendar Selectors */}
+                    <View style={[styles.modalFormRow, rowDirectionStyle]}>
+                      <View style={[styles.modalFormCol]}>
+                        <Text style={[styles.modalFormLabel, textAlignStyle]}>
+                          {startDateLabel}
+                        </Text>
+                        <DatePickerInput
+                          value={eventDate}
+                          onChange={(newDate) => {
+                            setEventDate(newDate);
+                            if (!eventEndDate || eventEndDate < newDate) {
+                              setEventEndDate(newDate);
+                            }
+                          }}
+                          placeholder="YYYY-MM-DD"
+                          isRTL={isRTL}
+                        />
+                      </View>
+                      <View style={[styles.modalFormCol]}>
+                        <Text style={[styles.modalFormLabel, textAlignStyle]}>
+                          {endDateLabel}
+                        </Text>
+                        <DatePickerInput
+                          value={eventEndDate || eventDate}
+                          onChange={setEventEndDate}
+                          placeholder="YYYY-MM-DD"
+                          isRTL={isRTL}
+                        />
+                      </View>
+                    </View>
+
+                    {/* Start & End Time Pickers conforming strictly to tripTimeFormat */}
+                    <View style={[styles.modalFormRow, rowDirectionStyle]}>
+                      <View style={[styles.modalFormCol]}>
+                        <Text style={[styles.modalFormLabel, textAlignStyle]}>
+                          {startTimeLabel}
+                        </Text>
+                        <TimePickerInput
+                          value={eventStartTime}
+                          onChange={(newStart) => {
+                            setEventStartTime(newStart);
+                            const startMin = parseTimeToMinutes(newStart);
+                            const endMin = parseTimeToMinutes(eventEndTime);
+                            if (startMin !== null && endMin !== null && endMin < startMin && eventEndDate === eventDate) {
+                              setEventEndDate(addDayToDateStr(eventDate));
+                            }
+                          }}
+                          format={tripTimeFormat}
+                          isRTL={isRTL}
+                          placeholder="10:30"
+                        />
+                      </View>
+                      <View style={[styles.modalFormCol]}>
+                        <Text style={[styles.modalFormLabel, textAlignStyle]}>
+                          {endTimeLabel}
+                        </Text>
+                        <TimePickerInput
+                          value={eventEndTime}
+                          onChange={(newEnd) => {
+                            setEventEndTime(newEnd);
+                            const startMin = parseTimeToMinutes(eventStartTime);
+                            const endMin = parseTimeToMinutes(newEnd);
+                            if (startMin !== null && endMin !== null && endMin < startMin && eventEndDate === eventDate) {
+                              setEventEndDate(addDayToDateStr(eventDate));
+                            }
+                          }}
+                          format={tripTimeFormat}
+                          isRTL={isRTL}
+                          placeholder="14:00"
+                        />
+                      </View>
+                    </View>
+                  </>
+                );
+              })()}
 
               {/* Cost (Broken into Amount + Currency Dropdown) */}
               <View style={[styles.modalFormRow, rowDirectionStyle]}>
@@ -2431,31 +2501,6 @@ export default function TripDashboardScreen() {
                       keyboardType="url"
                       autoCapitalize="none"
                     />
-                  </View>
-
-                  <View style={[styles.modalFormRow, rowDirectionStyle]}>
-                    <View style={[styles.modalFormCol]}>
-                      <Text style={[styles.modalFormLabel, textAlignStyle]}>
-                        {isRTL ? 'שעת צ\'ק-אין' : 'Check-In Time'}
-                      </Text>
-                      <TextInput
-                        style={[styles.modalFormInput, textAlignStyle]}
-                        placeholder="e.g. 15:00"
-                        value={eventCheckInTime}
-                        onChangeText={setEventCheckInTime}
-                      />
-                    </View>
-                    <View style={[styles.modalFormCol]}>
-                      <Text style={[styles.modalFormLabel, textAlignStyle]}>
-                        {isRTL ? 'שעת צ\'ק-אאוט' : 'Check-Out Time'}
-                      </Text>
-                      <TextInput
-                        style={[styles.modalFormInput, textAlignStyle]}
-                        placeholder="e.g. 11:00"
-                        value={eventCheckOutTime}
-                        onChangeText={setEventCheckOutTime}
-                      />
-                    </View>
                   </View>
 
                   <View style={[styles.modalFormRow, rowDirectionStyle]}>
