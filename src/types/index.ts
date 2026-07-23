@@ -73,6 +73,7 @@ export interface Event {
   cost?: number;
   hasKomootTrack?: boolean;
   komootTrackUrl?: string;
+  hasQrCode?: boolean;
 }
 
 export interface Document {

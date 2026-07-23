@@ -50,10 +50,24 @@ function getGeodesicPoints(start: Coordinate, end: Coordinate, numPoints: number
 interface DashboardMapProps {
   events: Event[];
   focusedEventId?: string | null;
+  onSelectEvent?: (event: Event) => void;
   onClose?: () => void;
 }
 
-export default function DashboardMap({ events }: DashboardMapProps) {
+export default function DashboardMap({ events, onSelectEvent }: DashboardMapProps) {
+  React.useEffect(() => {
+    const handleMessage = (evt: MessageEvent) => {
+      if (evt.data && evt.data.type === 'SELECT_EVENT' && onSelectEvent) {
+        const found = events.find(e => e.id === evt.data.id);
+        if (found) onSelectEvent(found);
+      }
+    };
+    if (typeof window !== 'undefined') {
+      window.addEventListener('message', handleMessage);
+      return () => window.removeEventListener('message', handleMessage);
+    }
+  }, [events, onSelectEvent]);
+
   const markerItems: string[] = [];
   const arcItems: string[] = [];
 
@@ -77,6 +91,11 @@ export default function DashboardMap({ events }: DashboardMapProps) {
           });
           var m = L.marker([${lat}, ${lon}], { icon: icon }).addTo(map);
           m.bindPopup('<b>${label}</b><br>${item.type.toUpperCase()}');
+          m.on('click', function() {
+            if (window.parent) {
+              window.parent.postMessage({ type: 'SELECT_EVENT', id: '${item.id}' }, '*');
+            }
+          });
           bounds.push([${lat}, ${lon}]);
         })();
       `);

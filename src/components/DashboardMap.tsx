@@ -7,6 +7,7 @@ import { Event } from '../types';
 interface DashboardMapProps {
   events: Event[];
   focusedEventId?: string | null;
+  onSelectEvent?: (event: Event) => void;
   onClose?: () => void;
 }
 

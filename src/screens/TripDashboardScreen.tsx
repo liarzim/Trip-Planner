@@ -142,9 +142,11 @@ export default function TripDashboardScreen() {
   const [geocodingSuccessMsg, setGeocodingSuccessMsg] = useState('');
   const [uploadingQrImage, setUploadingQrImage] = useState(false);
 
-  // Komoot Track States
+  // Komoot Track & QR Code States
   const [hasKomootTrack, setHasKomootTrack] = useState(false);
   const [komootTrackUrl, setKomootTrackUrl] = useState('');
+  const [hasQrCode, setHasQrCode] = useState(false);
+  const [selectedEventForMap, setSelectedEventForMap] = useState<Event | null>(null);
 
   // Flight Origin & Destination Geocoding States
   const [eventOriginAddress, setEventOriginAddress] = useState('');
@@ -155,7 +157,7 @@ export default function TripDashboardScreen() {
   const [geocodingDestLoading, setGeocodingDestLoading] = useState(false);
   const [geocodingDestSuccessMsg, setGeocodingDestSuccessMsg] = useState('');
 
-  const isImageQr = (val: string | null): boolean => {
+  const isImageQr = (val?: string | null): boolean => {
     if (!val) return false;
     return (
       val.startsWith('data:image/') ||
@@ -631,6 +633,7 @@ export default function TripDashboardScreen() {
     setEventTransportMode('');
     setHasKomootTrack(false);
     setKomootTrackUrl('');
+    setHasQrCode(false);
     setGeocodingSuccessMsg('');
     setGeocodingOriginSuccessMsg('');
     setGeocodingDestSuccessMsg('');
@@ -671,6 +674,7 @@ export default function TripDashboardScreen() {
     setEventCost(item.cost !== undefined ? item.cost.toString() : '');
     setHasKomootTrack(!!item.hasKomootTrack);
     setKomootTrackUrl(item.komootTrackUrl || '');
+    setHasQrCode(!!item.hasQrCode || !!item.qrCodeUrl || !!item.bookingReference);
     setGeocodingSuccessMsg('');
     setGeocodingOriginSuccessMsg('');
     setGeocodingDestSuccessMsg('');
@@ -844,6 +848,15 @@ export default function TripDashboardScreen() {
         return;
       }
 
+      if (hasQrCode && !eventQrCodeUrl.trim()) {
+        setEventFormError(
+          isRTL
+            ? 'יש להעלות תמונת קוד QR או להזין ערך קוד QR'
+            : 'Please upload a QR picture or enter QR code text'
+        );
+        return;
+      }
+
       let endEventDate = eventEndDate.trim() || eventDate.trim();
       const startMin = parseTimeToMinutes(eventStartTime);
       const endMin = parseTimeToMinutes(eventEndTime);
@@ -914,7 +927,7 @@ export default function TripDashboardScreen() {
           checkOutTime: finalCheckOutTime || undefined,
           distance: finalDistance,
           estimatedTravelTime: finalDurationText,
-          qrCodeUrl: eventQrCodeUrl.trim() || undefined,
+          qrCodeUrl: hasQrCode ? eventQrCodeUrl.trim() || undefined : undefined,
           transportMode: eventTransportMode || undefined,
           cost: costVal,
           originLatitude: finalOriginLat,
@@ -923,6 +936,7 @@ export default function TripDashboardScreen() {
           routePolyline: finalRoutePolyline,
           hasKomootTrack,
           komootTrackUrl: hasKomootTrack ? komootTrackUrl.trim() : undefined,
+          hasQrCode,
         });
       } else {
         await createEvent(
@@ -948,7 +962,7 @@ export default function TripDashboardScreen() {
           undefined,
           finalDistance,
           finalDurationText,
-          eventQrCodeUrl.trim() || undefined,
+          hasQrCode ? eventQrCodeUrl.trim() || undefined : undefined,
           eventTransportMode || undefined,
           costVal,
           finalOriginLat,
@@ -956,7 +970,8 @@ export default function TripDashboardScreen() {
           eventAddress.trim() || undefined,
           finalRoutePolyline,
           hasKomootTrack,
-          hasKomootTrack ? komootTrackUrl.trim() : undefined
+          hasKomootTrack ? komootTrackUrl.trim() : undefined,
+          hasQrCode
         );
       }
 
@@ -1183,13 +1198,14 @@ export default function TripDashboardScreen() {
     }
   };
 
+  const rowDirectionStyle = { flexDirection: (isRTL ? 'row-reverse' : 'row') as 'row' | 'row-reverse' };
+  const textAlignStyle = { textAlign: (isRTL ? 'right' : 'left') as 'left' | 'right' };
+  const alignSelfStyle = { alignSelf: (isRTL ? 'flex-end' : 'flex-start') as 'flex-start' | 'flex-end' };
+  const isWeb = Platform.OS === 'web';
+
   const renderEventItem = ({ item }: { item: Event }) => {
     const badge = getEventBadgeStyle(item.type);
     const hasCoordinates = typeof item.latitude === 'number' && typeof item.longitude === 'number';
-
-    const rowDirectionStyle = { flexDirection: (isRTL ? 'row-reverse' : 'row') as 'row' | 'row-reverse' };
-    const textAlignStyle = { textAlign: (isRTL ? 'right' : 'left') as 'left' | 'right' };
-    const alignSelfStyle = { alignSelf: (isRTL ? 'flex-end' : 'flex-start') as 'flex-start' | 'flex-end' };
     const weather = getWeatherForEvent(item);
     const isFlight = item.type === 'flight';
     const isHotel = item.type === 'hotel';
@@ -1479,11 +1495,11 @@ export default function TripDashboardScreen() {
 
         {/* Action buttons under event */}
         <View style={[styles.eventActionsRow, rowDirectionStyle]}>
-          {item.bookingReference ? (
+          {item.hasQrCode && (item.qrCodeUrl || item.bookingReference) ? (
             <TouchableOpacity 
               style={[styles.actionBtn, { marginRight: isRTL ? 0 : 8, marginLeft: isRTL ? 8 : 0 }]} 
               onPress={() => {
-                setSelectedBookingRef(item.bookingReference!);
+                setSelectedBookingRef(item.qrCodeUrl || item.bookingReference!);
                 setIsQrModalVisible(true);
               }}
               activeOpacity={0.7}
@@ -1664,10 +1680,134 @@ export default function TripDashboardScreen() {
     );
   };
 
-  const rowDirectionStyle = { flexDirection: (isRTL ? 'row-reverse' : 'row') as 'row' | 'row-reverse' };
-  const textAlignStyle = { textAlign: (isRTL ? 'right' : 'left') as 'left' | 'right' };
+  const renderSelectedEventDetailUnderMap = () => {
+    const targetEvent = selectedEventForMap || (events.length > 0 ? events[0] : null);
+    if (!targetEvent) return null;
 
-  const isWeb = Platform.OS === 'web';
+    const hasQr = targetEvent.hasQrCode && (targetEvent.qrCodeUrl || targetEvent.bookingReference);
+
+    return (
+      <View style={{
+        marginTop: 12,
+        backgroundColor: '#ffffff',
+        borderRadius: 16,
+        padding: 14,
+        borderWidth: 1,
+        borderColor: '#ced4da',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 6,
+        elevation: 3,
+      }}>
+        <View style={[rowDirectionStyle, { justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, borderBottomWidth: 1, borderBottomColor: '#f1f3f5', paddingBottom: 8 }]}>
+          <View style={[rowDirectionStyle, { alignItems: 'center', flex: 1 }]}>
+            <Text style={{ fontSize: 16, fontWeight: 'bold', color: colors.primary }}>
+              {targetEvent.title}
+            </Text>
+            <View style={[styles.badge, { backgroundColor: '#e7f5ff', marginLeft: 8, marginRight: 8 }]}>
+              <Text style={[styles.badgeText, { color: colors.primary }]}>
+                {targetEvent.type.toUpperCase()}
+              </Text>
+            </View>
+          </View>
+          {selectedEventForMap && (
+            <TouchableOpacity onPress={() => setSelectedEventForMap(null)} style={{ padding: 4 }}>
+              <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#868e96' }}>✕</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'flex-start' }}>
+          {/* Left Side: QR Code Image / Code */}
+          <View style={{
+            width: 120,
+            height: 120,
+            backgroundColor: '#f8f9fa',
+            borderRadius: 12,
+            borderWidth: 1,
+            borderColor: '#dee2e6',
+            justifyContent: 'center',
+            alignItems: 'center',
+            marginRight: isRTL ? 0 : 12,
+            marginLeft: isRTL ? 12 : 0,
+            padding: 4
+          }}>
+            {hasQr ? (
+              <TouchableOpacity 
+                style={{ width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center' }}
+                onPress={() => {
+                  setSelectedBookingRef(targetEvent.qrCodeUrl || targetEvent.bookingReference!);
+                  setIsQrModalVisible(true);
+                }}
+                activeOpacity={0.8}
+              >
+                {isImageQr(targetEvent.qrCodeUrl) ? (
+                  <Image source={{ uri: targetEvent.qrCodeUrl }} style={{ width: 110, height: 110, borderRadius: 8 }} resizeMode="contain" />
+                ) : (
+                  <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+                    {targetEvent.qrCodeUrl || targetEvent.bookingReference ? (
+                      <QRCode value={targetEvent.qrCodeUrl || targetEvent.bookingReference} size={90} />
+                    ) : (
+                      <>
+                        <Text style={{ fontSize: 36 }}>🎫</Text>
+                        <Text style={{ fontSize: 10, fontWeight: 'bold', color: colors.primary, marginTop: 4 }}>
+                          {isRTL ? 'הצג קוד QR' : 'View QR'}
+                        </Text>
+                      </>
+                    )}
+                  </View>
+                )}
+              </TouchableOpacity>
+            ) : (
+              <View style={{ alignItems: 'center', justifyContent: 'center', height: '100%' }}>
+                <Text style={{ fontSize: 32, opacity: 0.3 }}>📍</Text>
+                <Text style={{ fontSize: 10, color: '#adb5bd', marginTop: 4, fontWeight: 'bold' }}>
+                  {isRTL ? 'אין קוד QR' : 'No QR Code'}
+                </Text>
+              </View>
+            )}
+          </View>
+
+          {/* Main / Right Side: Event Details */}
+          <View style={{ flex: 1, justifyContent: 'center' }}>
+            <Text style={[textAlignStyle, { fontSize: 13, color: '#495057', fontWeight: 'bold', marginBottom: 6 }]}>
+              ⏰  {formatTimeByPreference(targetEvent.startTime, tripTimeFormat)} {targetEvent.endTime ? (isRTL ? `עד ${formatTimeByPreference(targetEvent.endTime, tripTimeFormat)}` : `to ${formatTimeByPreference(targetEvent.endTime, tripTimeFormat)}`) : ''}
+            </Text>
+
+            {targetEvent.address ? (
+              <Text style={[textAlignStyle, { fontSize: 12, color: '#495057', marginBottom: 4 }]} numberOfLines={2}>
+                📍 {targetEvent.address}
+              </Text>
+            ) : null}
+
+            {typeof targetEvent.cost === 'number' && (
+              <Text style={[textAlignStyle, { fontSize: 12, fontWeight: 'bold', color: '#2b8a3e', marginBottom: 4 }]}>
+                💰 {targetEvent.cost.toFixed(2)} {tripBaseCurrency}
+              </Text>
+            )}
+
+            {targetEvent.description ? (
+              <Text style={[textAlignStyle, { fontSize: 12, color: '#666', marginTop: 2 }]} numberOfLines={3}>
+                📝 {targetEvent.description}
+              </Text>
+            ) : null}
+
+            {targetEvent.hasKomootTrack && targetEvent.komootTrackUrl ? (
+              <TouchableOpacity 
+                style={{ marginTop: 8, backgroundColor: '#fff8f0', borderColor: '#fd7e14', borderWidth: 1, paddingVertical: 5, paddingHorizontal: 10, borderRadius: 8, alignSelf: isRTL ? 'flex-end' : 'flex-start' }}
+                onPress={() => handleNavigateKomoot(targetEvent.latitude, targetEvent.longitude, targetEvent.komootTrackUrl)}
+              >
+                <Text style={{ fontSize: 11, fontWeight: 'bold', color: '#d9480f' }}>
+                  🚴 {isRTL ? 'מסלול Komoot' : 'Komoot Track'}
+                </Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
+        </View>
+      </View>
+    );
+  };
 
   const dashboardContent = (
     <View style={styles.dashboardContainer}>
@@ -1796,7 +1936,8 @@ export default function TripDashboardScreen() {
         ) : null}
 
         <View style={{ flex: 1 }}>
-          <DashboardMap events={events} focusedEventId={focusedEventId} />
+          <DashboardMap events={events} focusedEventId={focusedEventId} onSelectEvent={setSelectedEventForMap} />
+          {renderSelectedEventDetailUnderMap()}
         </View>
         <TouchableOpacity 
           style={styles.mobileMapFab}
@@ -1899,7 +2040,8 @@ export default function TripDashboardScreen() {
             </View>
           </View>
           <View style={styles.webMapColumn}>
-            <DashboardMap events={events} focusedEventId={focusedEventId} />
+            <DashboardMap events={events} focusedEventId={focusedEventId} onSelectEvent={setSelectedEventForMap} />
+            {renderSelectedEventDetailUnderMap()}
           </View>
         </View>
       ) : (
@@ -2647,53 +2789,88 @@ export default function TripDashboardScreen() {
                     ) : null}
                   </View>
 
-                  {/* QR Code Text / URL or Image Upload */}
-                  <View style={{ marginBottom: 12 }}>
-                    <Text style={[styles.modalFormLabel, textAlignStyle]}>
-                      {isRTL ? 'ערך קוד QR או תמונת QR' : 'QR Code Value, Link or Picture'}
-                    </Text>
-                    <View style={[rowDirectionStyle, { alignItems: 'center', marginBottom: 6 }]}>
-                      <TextInput
-                        style={[styles.modalFormInput, textAlignStyle, { flex: 1 }]}
-                        placeholder={isRTL ? 'הזן טקסט/קישור או העלה תמונה' : 'Enter text/URL or upload image'}
-                        value={isImageQr(eventQrCodeUrl) ? (isRTL ? '[תמונת QR הועלתה]' : '[QR Image Uploaded]') : eventQrCodeUrl}
-                        onChangeText={setEventQrCodeUrl}
-                      />
+                  {/* QR Code Toggle & Image Upload Section */}
+                  <View style={{
+                    marginBottom: 16,
+                    backgroundColor: hasQrCode ? '#e6fcf5' : '#f8f9fa',
+                    padding: 14,
+                    borderRadius: 12,
+                    borderWidth: 1,
+                    borderColor: hasQrCode ? '#96f2d7' : '#dee2e6'
+                  }}>
+                    <View style={[rowDirectionStyle, { alignItems: 'center', justifyContent: 'space-between' }]}>
+                      <Text style={[styles.modalFormLabel, textAlignStyle, { marginBottom: 0, fontWeight: 'bold', fontSize: 14, color: '#0ca678' }]}>
+                        🎫 {isRTL ? 'קוד QR לכרטיס' : 'Ticket QR Code'}
+                      </Text>
                       <TouchableOpacity
-                        style={[
-                          styles.actionBtn,
-                          { 
-                            backgroundColor: '#fff3bf', 
-                            borderColor: '#ffd43b', 
-                            borderWidth: 1,
-                            paddingVertical: 10, 
-                            paddingHorizontal: 12, 
-                            marginLeft: isRTL ? 0 : 8, 
-                            marginRight: isRTL ? 8 : 0 
-                          }
-                        ]}
-                        onPress={handlePickQrImage}
-                        disabled={uploadingQrImage}
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          backgroundColor: hasQrCode ? '#12b886' : '#ced4da',
+                          borderRadius: 20,
+                          paddingVertical: 6,
+                          paddingHorizontal: 14,
+                        }}
+                        onPress={() => {
+                          const next = !hasQrCode;
+                          setHasQrCode(next);
+                          if (!next) setEventQrCodeUrl('');
+                        }}
                         activeOpacity={0.8}
                       >
-                        {uploadingQrImage ? (
-                          <ActivityIndicator size="small" color="#e67700" />
-                        ) : (
-                          <Text style={[styles.actionBtnText, { color: '#e67700', fontWeight: 'bold' }]}>
-                            📷 {isRTL ? 'העלה תמונה' : 'Upload Image'}
-                          </Text>
-                        )}
+                        <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 12 }}>
+                          {hasQrCode ? (isRTL ? 'מופעל (ON)' : 'ON') : (isRTL ? 'כבוי (OFF)' : 'OFF')}
+                        </Text>
                       </TouchableOpacity>
                     </View>
 
-                    {isImageQr(eventQrCodeUrl) && (
-                      <View style={{ alignItems: 'center', marginVertical: 6, backgroundColor: '#f8f9fa', padding: 8, borderRadius: 8 }}>
-                        <Image source={{ uri: eventQrCodeUrl }} style={{ width: 100, height: 100, resizeMode: 'contain' }} />
-                        <TouchableOpacity onPress={() => setEventQrCodeUrl('')}>
-                          <Text style={{ color: '#e03131', fontSize: 12, marginTop: 4, fontWeight: 'bold' }}>
-                            🗑️ {isRTL ? 'הסר תמונה' : 'Remove Image'}
-                          </Text>
-                        </TouchableOpacity>
+                    {hasQrCode && (
+                      <View style={{ marginTop: 12 }}>
+                        <Text style={[styles.modalFormLabel, textAlignStyle, { fontSize: 12, color: '#495057' }]}>
+                          {isRTL ? 'העלה תמונת QR (PNG, JPG, JPEG) או הזן טקסט/קישור' : 'Upload QR Picture (PNG, JPG, JPEG) or enter text/link'}
+                        </Text>
+                        <View style={[rowDirectionStyle, { alignItems: 'center', marginBottom: 6 }]}>
+                          <TextInput
+                            style={[styles.modalFormInput, textAlignStyle, { flex: 1, backgroundColor: '#ffffff', borderColor: '#12b886' }]}
+                            placeholder={isRTL ? 'הזן טקסט/קישור או העלה תמונה' : 'Enter text/URL or upload image'}
+                            value={isImageQr(eventQrCodeUrl) ? (isRTL ? '[תמונת QR הועלתה]' : '[QR Image Uploaded]') : eventQrCodeUrl}
+                            onChangeText={setEventQrCodeUrl}
+                          />
+                          <TouchableOpacity
+                            style={[
+                              styles.actionBtn,
+                              { 
+                                backgroundColor: '#12b886', 
+                                paddingVertical: 10, 
+                                paddingHorizontal: 12, 
+                                marginLeft: isRTL ? 0 : 8, 
+                                marginRight: isRTL ? 8 : 0 
+                              }
+                            ]}
+                            onPress={handlePickQrImage}
+                            disabled={uploadingQrImage}
+                            activeOpacity={0.8}
+                          >
+                            {uploadingQrImage ? (
+                              <ActivityIndicator size="small" color="#ffffff" />
+                            ) : (
+                              <Text style={[styles.actionBtnText, { color: '#ffffff', fontWeight: 'bold' }]}>
+                                📷 {isRTL ? 'העלה תמונה' : 'Upload Image'}
+                              </Text>
+                            )}
+                          </TouchableOpacity>
+                        </View>
+
+                        {isImageQr(eventQrCodeUrl) && (
+                          <View style={{ alignItems: 'center', marginVertical: 6, backgroundColor: '#ffffff', padding: 8, borderRadius: 8, borderWidth: 1, borderColor: '#96f2d7' }}>
+                            <Image source={{ uri: eventQrCodeUrl }} style={{ width: 100, height: 100, resizeMode: 'contain' }} />
+                            <TouchableOpacity onPress={() => setEventQrCodeUrl('')}>
+                              <Text style={{ color: '#e03131', fontSize: 12, marginTop: 4, fontWeight: 'bold' }}>
+                                🗑️ {isRTL ? 'הסר תמונה' : 'Remove Image'}
+                              </Text>
+                            </TouchableOpacity>
+                          </View>
+                        )}
                       </View>
                     )}
                   </View>

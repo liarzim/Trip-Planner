@@ -100,10 +100,11 @@ function getBearing(start: Coordinate, end: Coordinate): number {
 interface DashboardMapProps {
   events: Event[];
   focusedEventId?: string | null;
+  onSelectEvent?: (event: Event) => void;
   onClose?: () => void;
 }
 
-export default function DashboardMap({ events, focusedEventId }: DashboardMapProps) {
+export default function DashboardMap({ events, focusedEventId, onSelectEvent }: DashboardMapProps) {
   const mapRef = useRef<MapView>(null);
   const apiKey = appJson.expo.android.config.googleMaps.apiKey;
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
