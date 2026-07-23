@@ -2570,12 +2570,39 @@ export default function TripDashboardScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <View style={[styles.header, rowDirectionStyle]}>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.navigate('Home')}>
-          <Text style={styles.backText}>{isRTL ? '→ הטיולים שלי' : '← Dashboard'}</Text>
-        </TouchableOpacity>
+      <View style={[styles.header, rowDirectionStyle, { justifyContent: 'space-between', alignItems: 'center' }]}>
+        {/* Primary Corner Block (Right in Hebrew/RTL, Left in English/LTR) */}
+        <View style={[rowDirectionStyle, { alignItems: 'center' }]}>
+          <TouchableOpacity
+            style={{
+              backgroundColor: '#1b4332',
+              paddingHorizontal: 12,
+              paddingVertical: 6,
+              borderRadius: 8,
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginRight: isRTL ? 0 : 10,
+              marginLeft: isRTL ? 10 : 0,
+              elevation: 2,
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 1 },
+              shadowOpacity: 0.1,
+              shadowRadius: 2,
+            }}
+            onPress={() => setIsHamburgerMenuOpen(!isHamburgerMenuOpen)}
+            activeOpacity={0.8}
+          >
+            <Text style={{ color: '#ffffff', fontSize: 16, fontWeight: 'bold' }}>☰</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.backButton} onPress={() => navigation.navigate('Home')}>
+            <Text style={styles.backText}>{isRTL ? '→ הטיולים שלי' : '← Dashboard'}</Text>
+          </TouchableOpacity>
+        </View>
+
         <Text style={styles.headerTitle}>{t('dashboard.title')}</Text>
         
+        {/* Secondary Corner Block (Left in Hebrew/RTL, Right in English/LTR) */}
         <View style={[rowDirectionStyle, { alignItems: 'center' }]}>
           <TouchableOpacity 
             style={[
@@ -2610,29 +2637,6 @@ export default function TripDashboardScreen() {
             <Text style={styles.settingsButtonText}>⚙️</Text>
           </TouchableOpacity>
           <LanguageSelector />
-
-          {/* Hamburger Menu Button */}
-          <TouchableOpacity
-            style={{
-              backgroundColor: '#1b4332',
-              paddingHorizontal: 12,
-              paddingVertical: 6,
-              borderRadius: 8,
-              alignItems: 'center',
-              justifyContent: 'center',
-              marginLeft: isRTL ? 0 : 8,
-              marginRight: isRTL ? 8 : 0,
-              elevation: 2,
-              shadowColor: '#000',
-              shadowOffset: { width: 0, height: 1 },
-              shadowOpacity: 0.1,
-              shadowRadius: 2,
-            }}
-            onPress={() => setIsHamburgerMenuOpen(!isHamburgerMenuOpen)}
-            activeOpacity={0.8}
-          >
-            <Text style={{ color: '#ffffff', fontSize: 16, fontWeight: 'bold' }}>☰</Text>
-          </TouchableOpacity>
         </View>
       </View>
 
