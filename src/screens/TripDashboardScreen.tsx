@@ -2013,7 +2013,7 @@ export default function TripDashboardScreen() {
             ) : null}
           </View>
 
-          <View style={[rowDirectionStyle, { gap: 8, marginTop: 8 }]}>
+          <View style={[rowDirectionStyle, { gap: 8, marginTop: 10, justifyContent: 'flex-end', width: '100%', flexWrap: 'wrap' }]}>
             {targetEvent.hasKomootTrack && targetEvent.komootTrackUrl ? (
               <TouchableOpacity 
                 style={{
@@ -2052,6 +2052,42 @@ export default function TripDashboardScreen() {
                 </Text>
               </TouchableOpacity>
             ) : null}
+
+            <TouchableOpacity 
+              style={{
+                backgroundColor: '#fff5f5',
+                borderWidth: 1,
+                borderColor: '#ffc9c9',
+                paddingVertical: 5,
+                paddingHorizontal: 12,
+                borderRadius: 6,
+                alignItems: 'center',
+              }}
+              onPress={() => handleDeleteEventItem(targetEvent.id, targetEvent.title)}
+              activeOpacity={0.8}
+            >
+              <Text style={{ color: '#e03131', fontSize: 11, fontWeight: 'bold' }}>
+                🗑️ {isRTL ? 'מחק' : 'Delete'}
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={{
+                backgroundColor: '#e7f5ff',
+                borderWidth: 1,
+                borderColor: '#a5d8ff',
+                paddingVertical: 5,
+                paddingHorizontal: 12,
+                borderRadius: 6,
+                alignItems: 'center',
+              }}
+              onPress={() => handleOpenEditEventModal(targetEvent)}
+              activeOpacity={0.8}
+            >
+              <Text style={{ color: '#1971c2', fontSize: 11, fontWeight: 'bold' }}>
+                ✏️ {isRTL ? 'ערוך' : 'Edit'}
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
       </View>
@@ -2306,6 +2342,106 @@ export default function TripDashboardScreen() {
         </View>
       </View>
     </Modal>
+  );
+
+  const renderWebSubHeaderBanner = () => (
+    <View style={[rowDirectionStyle, {
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+      backgroundColor: '#ffffff',
+      borderBottomWidth: 1,
+      borderBottomColor: '#e9ecef',
+      marginBottom: 12,
+      borderRadius: 12,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.05,
+      shadowRadius: 4,
+      elevation: 2,
+    }]}>
+      {/* Far Left: Dark Green Total Spent Widget */}
+      <View style={{
+        backgroundColor: '#1b4332',
+        borderRadius: 10,
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 3,
+      }}>
+        <Text style={{ fontSize: 20 }}>💰</Text>
+        <View>
+          <Text style={{ fontSize: 10, color: '#b7e4c7', fontWeight: 'bold' }}>
+            {isRTL ? 'סה"כ הוצאות' : 'TOTAL SPENT'}
+          </Text>
+          <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#ffffff', marginTop: 1 }}>
+            ₪{totalSpent.toFixed(2)} ILS
+          </Text>
+        </View>
+      </View>
+
+      {/* Center: Trip Title Banner & Dates */}
+      <View style={{ alignItems: 'center' }}>
+        <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#1b4332' }}>
+          {tripName || (isRTL ? 'טיול להר אולימפוס - אמיר ומיכה' : 'My Trip')}
+        </Text>
+        {(tripStartDate || tripEndDate) && (
+          <Text style={{ fontSize: 12, color: '#495057', fontWeight: '500', marginTop: 2 }}>
+            📅 {tripStartDate}{tripEndDate ? ` — ${tripEndDate}` : ''}
+          </Text>
+        )}
+      </View>
+
+      {/* Far Right: Weather Strip + Hamburger Button */}
+      <View style={[rowDirectionStyle, { alignItems: 'center', gap: 10 }]}>
+        {/* Weather Forecast Strip */}
+        {weatherForecast && weatherForecast.daily && (
+          <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', gap: 6 }}>
+            {weatherForecast.daily.slice(0, 5).map((day: any, idx: number) => {
+              return (
+                <View key={idx} style={{
+                  backgroundColor: '#f8f9fa',
+                  borderRadius: 8,
+                  paddingHorizontal: 8,
+                  paddingVertical: 4,
+                  alignItems: 'center',
+                  borderWidth: 1,
+                  borderColor: '#e9ecef',
+                  minWidth: 52,
+                }}>
+                  <Text style={{ fontSize: 13 }}>{getWeatherEmoji(day.status)}</Text>
+                  <Text style={{ fontSize: 11, fontWeight: 'bold', color: '#343a40' }}>{day.temp}°C</Text>
+                </View>
+              );
+            })}
+          </View>
+        )}
+
+        {/* Hamburger Icon Button */}
+        <TouchableOpacity 
+          style={{
+            backgroundColor: '#212529',
+            width: 40,
+            height: 40,
+            borderRadius: 8,
+            alignItems: 'center',
+            justifyContent: 'center',
+            elevation: 3,
+          }}
+          onPress={() => setIsHamburgerMenuOpen(!isHamburgerMenuOpen)}
+          activeOpacity={0.8}
+        >
+          <Text style={{ color: '#ffffff', fontSize: 22, fontWeight: 'bold' }}>☰</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
   );
 
   const dashboardContent = (
@@ -2593,8 +2729,8 @@ export default function TripDashboardScreen() {
         </View>
       )}
 
-      {/* Always Visible Persistent Trip Title & Dates Banner */}
-      {tripName ? (
+      {/* Always Visible Persistent Trip Title & Dates Banner (Mobile only) */}
+      {!isWeb && tripName ? (
         <View style={styles.persistentTripHeaderBanner}>
           <Text style={styles.persistentTripName}>
             {tripName}
@@ -2617,28 +2753,50 @@ export default function TripDashboardScreen() {
       )}
 
       {isWeb ? (
-        <View style={styles.webSplitLayout}>
-          <View style={styles.webMapColumn}>
-            <DashboardMap events={events} focusedEventId={focusedEventId} onSelectEvent={setSelectedEventForMap} />
-            {renderSelectedEventDetailUnderMap()}
-          </View>
-          <View style={styles.webDashboardColumn}>
-            {dashboardContent}
-            <View style={[styles.webButtonRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-              <TouchableOpacity 
-                style={[styles.webActionBtn, styles.expenseButton]}
-                onPress={() => navigation.navigate('AddExpense', { tripId })}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.buttonText}>+ {isRTL ? 'הוסף הוצאה' : 'Add Expense'}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                style={[styles.webActionBtn, styles.eventButton]}
-                onPress={handleOpenAddEventModal}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.buttonText}>+ {isRTL ? 'הוסף אירוע' : 'Add Event'}</Text>
-              </TouchableOpacity>
+        <View style={{ flex: 1, paddingHorizontal: 16, paddingTop: 10 }}>
+          {/* Sub-Header Banner (Total Spent, Trip Title & Dates, Weather Strip, Hamburger) */}
+          {renderWebSubHeaderBanner()}
+
+          <View style={styles.webSplitLayout}>
+            {/* Left Column (~62%): Map + Under-Map Cards */}
+            <View style={styles.webMapColumn}>
+              <DashboardMap events={events} focusedEventId={focusedEventId} onSelectEvent={setSelectedEventForMap} />
+              {renderSelectedEventDetailUnderMap()}
+            </View>
+
+            {/* Right Column (~38%): Scrollable Itinerary Events List + Bottom Action Buttons */}
+            <View style={styles.webDashboardColumn}>
+              <View style={{ flex: 1, overflow: 'hidden' }}>
+                <FlatList
+                  data={events}
+                  keyExtractor={(item) => item.id}
+                  renderItem={renderEventItem}
+                  contentContainerStyle={styles.listContainer}
+                  showsVerticalScrollIndicator={true}
+                  ListEmptyComponent={
+                    <View style={styles.emptyContainer}>
+                      <Text style={styles.emptyText}>{t('dashboard.no_events')}</Text>
+                    </View>
+                  }
+                />
+              </View>
+
+              <View style={[styles.webButtonRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+                <TouchableOpacity 
+                  style={[styles.webActionBtn, { backgroundColor: '#1b4332' }]}
+                  onPress={handleOpenAddEventModal}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.buttonText}>+ {isRTL ? 'הוסף אירוע' : 'Add Event'}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  style={[styles.webActionBtn, { backgroundColor: '#d9480f' }]}
+                  onPress={() => navigation.navigate('AddExpense', { tripId })}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.buttonText}>+ {isRTL ? 'הוסף הוצאה' : 'Add Expense'}</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
         </View>
