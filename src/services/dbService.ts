@@ -305,6 +305,7 @@ export const getEventsForTrip = async (tripId: string): Promise<Event[]> => {
       hasKomootTrack: data.hasKomootTrack,
       komootTrackUrl: data.komootTrackUrl,
       hasQrCode: data.hasQrCode,
+      galleryImages: data.galleryImages,
     } as Event;
   });
 };

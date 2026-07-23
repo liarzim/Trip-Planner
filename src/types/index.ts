@@ -74,6 +74,7 @@ export interface Event {
   hasKomootTrack?: boolean;
   komootTrackUrl?: string;
   hasQrCode?: boolean;
+  galleryImages?: string[];
 }
 
 export interface Document {

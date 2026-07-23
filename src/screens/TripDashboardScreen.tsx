@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   View, 
   Text, 
@@ -147,6 +147,12 @@ export default function TripDashboardScreen() {
   const [komootTrackUrl, setKomootTrackUrl] = useState('');
   const [hasQrCode, setHasQrCode] = useState(false);
   const [selectedEventForMap, setSelectedEventForMap] = useState<Event | null>(null);
+
+  // Photo Gallery & Box 1 Tab States
+  const [box1ActiveTab, setBox1ActiveTab] = useState<'qr' | 'gallery'>('qr');
+  const [galleryCurrentIndex, setGalleryCurrentIndex] = useState(0);
+  const [isPhotoPopupVisible, setIsPhotoPopupVisible] = useState(false);
+  const [popupImageUri, setPopupImageUri] = useState('');
 
   // Flight Origin & Destination Geocoding States
   const [eventOriginAddress, setEventOriginAddress] = useState('');
@@ -1700,14 +1706,93 @@ export default function TripDashboardScreen() {
     );
   };
 
+  // Auto-rotate Photo Gallery images every 3 seconds when gallery tab is active
+  useEffect(() => {
+    if (!isWeb) return;
+    const targetEvent = selectedEventForMap || (events.length > 0 ? events[0] : null);
+    if (!targetEvent) return;
+
+    const imgs: string[] = [];
+    if (targetEvent.qrCodeUrl && isImageQr(targetEvent.qrCodeUrl)) {
+      imgs.push(targetEvent.qrCodeUrl);
+    }
+    if (targetEvent.galleryImages && targetEvent.galleryImages.length > 0) {
+      imgs.push(...targetEvent.galleryImages);
+    }
+    documents.forEach((doc) => {
+      if (doc.downloadUrl && isImageQr(doc.downloadUrl)) {
+        imgs.push(doc.downloadUrl);
+      }
+    });
+
+    if (imgs.length === 0) {
+      imgs.push(
+        'https://images.unsplash.com/photo-1548574505-5e2386903b7f?w=800&auto=format&fit=crop&q=80',
+        'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=800&auto=format&fit=crop&q=80',
+        'https://images.unsplash.com/photo-1516483638261-f4dbaf036963?w=800&auto=format&fit=crop&q=80',
+        'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=800&auto=format&fit=crop&q=80'
+      );
+    }
+
+    if (box1ActiveTab === 'gallery' && imgs.length > 1) {
+      const timer = setInterval(() => {
+        setGalleryCurrentIndex((prev) => (prev + 1) % imgs.length);
+      }, 3000);
+      return () => clearInterval(timer);
+    }
+  }, [box1ActiveTab, selectedEventForMap, events, documents, isWeb]);
+
+  const handleShareEmail = (imgUrl: string, eventTitle: string) => {
+    const subject = encodeURIComponent(isRTL ? `תמונת אירוע: ${eventTitle}` : `Event Image: ${eventTitle}`);
+    const body = encodeURIComponent(isRTL ? `שלום,\n\nמצורף קישור לתמונה מאירוע "${eventTitle}":\n\n${imgUrl}\n\nבברכה!` : `Hello,\n\nHere is the image link for "${eventTitle}":\n\n${imgUrl}`);
+    const mailtoUrl = `mailto:?subject=${subject}&body=${body}`;
+    Linking.openURL(mailtoUrl).catch(console.error);
+  };
+
+  const handleShareWhatsApp = (imgUrl: string, eventTitle: string) => {
+    const text = encodeURIComponent(isRTL ? `*${eventTitle}*\nהנה תמונת האירוע:\n${imgUrl}` : `*${eventTitle}*\nCheck out this image:\n${imgUrl}`);
+    const waUrl = `https://api.whatsapp.com/send?text=${text}`;
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      window.open(waUrl, '_blank');
+    } else {
+      Linking.openURL(waUrl).catch(() => {
+        Linking.openURL(`whatsapp://send?text=${text}`);
+      });
+    }
+  };
+
   const renderSelectedEventDetailUnderMap = () => {
     const targetEvent = selectedEventForMap || (events.length > 0 ? events[0] : null);
     if (!targetEvent) return null;
 
     const hasQr = targetEvent.hasQrCode && (targetEvent.qrCodeUrl || targetEvent.bookingReference);
 
+    // Build Gallery images array
+    const galleryImgs: string[] = [];
+    if (targetEvent.qrCodeUrl && isImageQr(targetEvent.qrCodeUrl)) {
+      galleryImgs.push(targetEvent.qrCodeUrl);
+    }
+    if (targetEvent.galleryImages && targetEvent.galleryImages.length > 0) {
+      galleryImgs.push(...targetEvent.galleryImages);
+    }
+    documents.forEach((doc) => {
+      if (doc.downloadUrl && isImageQr(doc.downloadUrl)) {
+        galleryImgs.push(doc.downloadUrl);
+      }
+    });
+    if (galleryImgs.length === 0) {
+      galleryImgs.push(
+        'https://images.unsplash.com/photo-1548574505-5e2386903b7f?w=800&auto=format&fit=crop&q=80',
+        'https://images.unsplash.com/photo-1506744038136-46273834b3fb?w=800&auto=format&fit=crop&q=80',
+        'https://images.unsplash.com/photo-1516483638261-f4dbaf036963?w=800&auto=format&fit=crop&q=80',
+        'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=800&auto=format&fit=crop&q=80'
+      );
+    }
+
+    const activeGalleryImage = galleryImgs[galleryCurrentIndex % galleryImgs.length];
+
     return (
-      <View style={{ flexDirection: 'row', gap: 12, marginTop: 14, width: '100%', alignItems: 'stretch' }}>
+      <View style={{ flexDirection: 'row', gap: 12, marginTop: 12, width: '100%', flex: 1, alignItems: 'stretch' }}>
         {/* Box 1 (Left Box): QR Code / Picture Gallery */}
         <View style={{
           flex: 1,
@@ -1721,12 +1806,43 @@ export default function TripDashboardScreen() {
           shadowOpacity: 0.08,
           shadowRadius: 6,
           elevation: 2,
-          minHeight: 180,
+          height: '100%',
+          justifyContent: 'space-between',
         }}>
+          {/* Header with Segmented Tab Control */}
           <View style={[rowDirectionStyle, { justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#f1f3f5', paddingBottom: 6, marginBottom: 8 }]}>
-            <Text style={{ fontSize: 13, fontWeight: 'bold', color: '#495057' }}>
-              📷 {isRTL ? 'קוד QR / גלריית תמונות' : 'QR CODE / Picture Gallery'}
-            </Text>
+            <View style={{ flexDirection: 'row', backgroundColor: '#f1f3f5', borderRadius: 8, padding: 2 }}>
+              <TouchableOpacity 
+                style={{
+                  paddingVertical: 4,
+                  paddingHorizontal: 10,
+                  borderRadius: 6,
+                  backgroundColor: box1ActiveTab === 'qr' ? '#ffffff' : 'transparent',
+                }}
+                onPress={() => setBox1ActiveTab('qr')}
+                activeOpacity={0.8}
+              >
+                <Text style={{ fontSize: 11, fontWeight: 'bold', color: box1ActiveTab === 'qr' ? colors.primary : '#6c757d' }}>
+                  🎫 {isRTL ? 'קוד QR' : 'QR Code'}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={{
+                  paddingVertical: 4,
+                  paddingHorizontal: 10,
+                  borderRadius: 6,
+                  backgroundColor: box1ActiveTab === 'gallery' ? '#ffffff' : 'transparent',
+                }}
+                onPress={() => setBox1ActiveTab('gallery')}
+                activeOpacity={0.8}
+              >
+                <Text style={{ fontSize: 11, fontWeight: 'bold', color: box1ActiveTab === 'gallery' ? colors.primary : '#6c757d' }}>
+                  🖼️ {isRTL ? 'גלריית תמונות' : 'Photo Gallery'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+
             {selectedEventForMap && (
               <TouchableOpacity onPress={() => setSelectedEventForMap(null)} style={{ padding: 2 }}>
                 <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#868e96' }}>✕</Text>
@@ -1734,32 +1850,83 @@ export default function TripDashboardScreen() {
             )}
           </View>
 
+          {/* Body Content */}
           <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 4 }}>
-            {hasQr ? (
-              <TouchableOpacity 
-                style={{ width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center' }}
-                onPress={() => {
-                  setSelectedBookingRef(targetEvent.qrCodeUrl || targetEvent.bookingReference!);
-                  setIsQrModalVisible(true);
-                }}
-                activeOpacity={0.8}
-              >
-                {isImageQr(targetEvent.qrCodeUrl) ? (
-                  <Image source={{ uri: targetEvent.qrCodeUrl }} style={{ width: '100%', height: 130, borderRadius: 10 }} resizeMode="contain" />
-                ) : (
-                  <View style={{ alignItems: 'center', justifyContent: 'center' }}>
-                    {targetEvent.qrCodeUrl || targetEvent.bookingReference ? (
-                      <QRCode value={targetEvent.qrCodeUrl || targetEvent.bookingReference} size={110} />
-                    ) : null}
-                  </View>
-                )}
-              </TouchableOpacity>
+            {box1ActiveTab === 'qr' ? (
+              hasQr ? (
+                <TouchableOpacity 
+                  style={{ width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center' }}
+                  onPress={() => {
+                    setSelectedBookingRef(targetEvent.qrCodeUrl || targetEvent.bookingReference!);
+                    setIsQrModalVisible(true);
+                  }}
+                  activeOpacity={0.8}
+                >
+                  {isImageQr(targetEvent.qrCodeUrl) ? (
+                    <Image source={{ uri: targetEvent.qrCodeUrl }} style={{ width: '100%', height: '100%', minHeight: 160, borderRadius: 10 }} resizeMode="contain" />
+                  ) : (
+                    <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+                      {targetEvent.qrCodeUrl || targetEvent.bookingReference ? (
+                        <QRCode value={targetEvent.qrCodeUrl || targetEvent.bookingReference} size={140} />
+                      ) : null}
+                    </View>
+                  )}
+                </TouchableOpacity>
+              ) : (
+                <View style={{ alignItems: 'center', justifyContent: 'center', opacity: 0.6, paddingVertical: 10 }}>
+                  <Text style={{ fontSize: 40, marginBottom: 4 }}>🎫</Text>
+                  <Text style={{ fontSize: 12, color: '#868e96', textAlign: 'center', fontWeight: '500' }}>
+                    {isRTL ? 'אין קוד QR / כרטיס מצורף' : 'No Ticket QR attached'}
+                  </Text>
+                </View>
+              )
             ) : (
-              <View style={{ alignItems: 'center', justifyContent: 'center', opacity: 0.6, paddingVertical: 10 }}>
-                <Text style={{ fontSize: 36, marginBottom: 4 }}>📷</Text>
-                <Text style={{ fontSize: 12, color: '#868e96', textAlign: 'center', fontWeight: '500' }}>
-                  {isRTL ? 'אין קוד QR / תמונה מצורפת' : 'No QR Code or Image attached'}
-                </Text>
+              /* Photo Gallery Tab */
+              <View style={{ width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center', position: 'relative' }}>
+                <TouchableOpacity 
+                  style={{ width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center' }}
+                  onPress={() => {
+                    setPopupImageUri(activeGalleryImage);
+                    setIsPhotoPopupVisible(true);
+                  }}
+                  activeOpacity={0.9}
+                >
+                  <Image 
+                    source={{ uri: activeGalleryImage }} 
+                    style={{ width: '100%', height: '100%', minHeight: 160, borderRadius: 12 }} 
+                    resizeMode="cover" 
+                  />
+                  <View style={{
+                    position: 'absolute',
+                    bottom: 8,
+                    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+                    paddingHorizontal: 10,
+                    paddingVertical: 4,
+                    borderRadius: 12,
+                  }}>
+                    <Text style={{ color: '#ffffff', fontSize: 11, fontWeight: 'bold' }}>
+                      {(galleryCurrentIndex % galleryImgs.length) + 1} / {galleryImgs.length} ({isRTL ? 'לחץ להגדלה' : 'Click to enlarge'})
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+
+                {/* Left/Right Carousel Controls */}
+                {galleryImgs.length > 1 && (
+                  <>
+                    <TouchableOpacity 
+                      style={{ position: 'absolute', left: 6, top: '45%', backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 14, width: 28, height: 28, alignItems: 'center', justifyContent: 'center' }}
+                      onPress={() => setGalleryCurrentIndex((prev) => (prev - 1 + galleryImgs.length) % galleryImgs.length)}
+                    >
+                      <Text style={{ color: '#fff', fontSize: 16, fontWeight: 'bold' }}>‹</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      style={{ position: 'absolute', right: 6, top: '45%', backgroundColor: 'rgba(0,0,0,0.5)', borderRadius: 14, width: 28, height: 28, alignItems: 'center', justifyContent: 'center' }}
+                      onPress={() => setGalleryCurrentIndex((prev) => (prev + 1) % galleryImgs.length)}
+                    >
+                      <Text style={{ color: '#fff', fontSize: 16, fontWeight: 'bold' }}>›</Text>
+                    </TouchableOpacity>
+                  </>
+                )}
               </View>
             )}
           </View>
@@ -1778,7 +1945,7 @@ export default function TripDashboardScreen() {
           shadowOpacity: 0.08,
           shadowRadius: 6,
           elevation: 2,
-          minHeight: 180,
+          height: '100%',
           justifyContent: 'space-between',
         }}>
           <View style={[rowDirectionStyle, { justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#f1f3f5', paddingBottom: 6, marginBottom: 8 }]}>
@@ -1873,6 +2040,116 @@ export default function TripDashboardScreen() {
           </View>
         </View>
       </View>
+    );
+  };
+
+  const renderPhotoPopupModal = () => {
+    const targetEvent = selectedEventForMap || (events.length > 0 ? events[0] : null);
+    const eventTitle = targetEvent ? targetEvent.title : 'Event Photo';
+
+    return (
+      <Modal
+        visible={isPhotoPopupVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setIsPhotoPopupVisible(false)}
+      >
+        <View style={{
+          flex: 1,
+          backgroundColor: 'rgba(0, 0, 0, 0.85)',
+          justifyContent: 'center',
+          alignItems: 'center',
+          padding: 20,
+        }}>
+          <View style={{
+            width: '90%',
+            maxWidth: 600,
+            backgroundColor: '#ffffff',
+            borderRadius: 16,
+            padding: 20,
+            alignItems: 'center',
+            elevation: 6,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.3,
+            shadowRadius: 8,
+          }}>
+            <View style={[rowDirectionStyle, { justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: 12 }]}>
+              <Text style={{ fontSize: 16, fontWeight: 'bold', color: colors.text }}>
+                🖼️ {eventTitle}
+              </Text>
+              <TouchableOpacity onPress={() => setIsPhotoPopupVisible(false)} style={{ padding: 4 }}>
+                <Text style={{ fontSize: 20, fontWeight: 'bold', color: '#868e96' }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            {popupImageUri ? (
+              <Image 
+                source={{ uri: popupImageUri }} 
+                style={{ width: '100%', height: 350, borderRadius: 12, marginBottom: 16 }} 
+                resizeMode="contain" 
+              />
+            ) : null}
+
+            {/* 3 Action Buttons */}
+            <View style={[rowDirectionStyle, { gap: 10, width: '100%', justifyContent: 'center' }]}>
+              <TouchableOpacity
+                style={{
+                  flex: 1,
+                  backgroundColor: '#25D366',
+                  paddingVertical: 10,
+                  paddingHorizontal: 12,
+                  borderRadius: 8,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+                onPress={() => handleShareWhatsApp(popupImageUri, eventTitle)}
+                activeOpacity={0.8}
+              >
+                <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 12 }}>
+                  💬 WhatsApp
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={{
+                  flex: 1,
+                  backgroundColor: '#1971c2',
+                  paddingVertical: 10,
+                  paddingHorizontal: 12,
+                  borderRadius: 8,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+                onPress={() => handleShareEmail(popupImageUri, eventTitle)}
+                activeOpacity={0.8}
+              >
+                <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 12 }}>
+                  ✉️ {isRTL ? 'שלח במייל' : 'Email'}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={{
+                  flex: 0.8,
+                  backgroundColor: '#f1f3f5',
+                  paddingVertical: 10,
+                  paddingHorizontal: 12,
+                  borderRadius: 8,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+                onPress={() => setIsPhotoPopupVisible(false)}
+                activeOpacity={0.8}
+              >
+                <Text style={{ color: '#495057', fontWeight: 'bold', fontSize: 12 }}>
+                  ✕ {isRTL ? 'סגור' : 'Close'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     );
   };
 
@@ -2143,6 +2420,9 @@ export default function TripDashboardScreen() {
           </TouchableOpacity>
         </View>
       )}
+
+      {/* Enlarged Photo Popup Modal */}
+      {renderPhotoPopupModal()}
 
       {/* Ticket QR Code Modal */}
       <Modal
