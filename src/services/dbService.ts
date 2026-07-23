@@ -169,7 +169,9 @@ export const createEvent = async (
   originLatitude?: number,
   originLongitude?: number,
   address?: string,
-  routePolyline?: string
+  routePolyline?: string,
+  hasKomootTrack?: boolean,
+  komootTrackUrl?: string
 ): Promise<Event> => {
   const eventsCollection = collection(db, 'events');
   const data: any = {
@@ -203,6 +205,8 @@ export const createEvent = async (
   if (originLongitude !== undefined) data.originLongitude = originLongitude;
   if (address !== undefined) data.address = address;
   if (routePolyline !== undefined) data.routePolyline = routePolyline;
+  if (hasKomootTrack !== undefined) data.hasKomootTrack = hasKomootTrack;
+  if (komootTrackUrl !== undefined) data.komootTrackUrl = komootTrackUrl;
 
   const docRef = await addDoc(eventsCollection, data);
 
@@ -237,6 +241,8 @@ export const createEvent = async (
     originLongitude,
     address,
     routePolyline,
+    hasKomootTrack,
+    komootTrackUrl,
   };
 };
 
@@ -293,6 +299,8 @@ export const getEventsForTrip = async (tripId: string): Promise<Event[]> => {
       routePolyline: data.routePolyline,
       transportMode: data.transportMode,
       cost: data.cost,
+      hasKomootTrack: data.hasKomootTrack,
+      komootTrackUrl: data.komootTrackUrl,
     } as Event;
   });
 };

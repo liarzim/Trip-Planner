@@ -142,6 +142,10 @@ export default function TripDashboardScreen() {
   const [geocodingSuccessMsg, setGeocodingSuccessMsg] = useState('');
   const [uploadingQrImage, setUploadingQrImage] = useState(false);
 
+  // Komoot Track States
+  const [hasKomootTrack, setHasKomootTrack] = useState(false);
+  const [komootTrackUrl, setKomootTrackUrl] = useState('');
+
   // Flight Origin & Destination Geocoding States
   const [eventOriginAddress, setEventOriginAddress] = useState('');
   const [geocodingOriginLoading, setGeocodingOriginLoading] = useState(false);
@@ -496,8 +500,28 @@ export default function TripDashboardScreen() {
     }
   };
 
-  // Deep Link Navigation with Komoot (with Google Maps fallback)
-  const handleNavigateKomoot = async (lat: number, lon: number) => {
+  // Deep Link Navigation with Komoot (with Google Maps fallback & custom track URL)
+  const handleNavigateKomoot = async (lat?: number, lon?: number, customUrl?: string) => {
+    if (customUrl && customUrl.trim()) {
+      let target = customUrl.trim();
+      if (!target.startsWith('http://') && !target.startsWith('https://')) {
+        target = 'https://' + target;
+      }
+      if (Platform.OS === 'web' && typeof window !== 'undefined') {
+        window.open(target, '_blank');
+      } else {
+        Linking.openURL(target).catch((err) => {
+          console.error('Error opening custom Komoot URL:', err);
+          if (typeof lat === 'number' && typeof lon === 'number') {
+            Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${lat},${lon}`);
+          }
+        });
+      }
+      return;
+    }
+
+    if (typeof lat !== 'number' || typeof lon !== 'number') return;
+
     if (Platform.OS === 'web') {
       // On web browser, open Komoot Web interactive trail planner in a new tab
       const webUrl = `https://www.komoot.com/plan/@${lat},${lon},14z`;
@@ -605,6 +629,8 @@ export default function TripDashboardScreen() {
     setEventCheckOutTime('');
     setEventQrCodeUrl('');
     setEventTransportMode('');
+    setHasKomootTrack(false);
+    setKomootTrackUrl('');
     setGeocodingSuccessMsg('');
     setGeocodingOriginSuccessMsg('');
     setGeocodingDestSuccessMsg('');
@@ -643,6 +669,8 @@ export default function TripDashboardScreen() {
     setEventQrCodeUrl(item.qrCodeUrl || '');
     setEventTransportMode((item.transportMode as 'driving' | 'transit') || '');
     setEventCost(item.cost !== undefined ? item.cost.toString() : '');
+    setHasKomootTrack(!!item.hasKomootTrack);
+    setKomootTrackUrl(item.komootTrackUrl || '');
     setGeocodingSuccessMsg('');
     setGeocodingOriginSuccessMsg('');
     setGeocodingDestSuccessMsg('');
@@ -807,6 +835,15 @@ export default function TripDashboardScreen() {
         return;
       }
 
+      if (hasKomootTrack && !komootTrackUrl.trim()) {
+        setEventFormError(
+          isRTL
+            ? 'יש להזין קישור תקין למסלול Komoot'
+            : 'Please enter a valid Komoot track link'
+        );
+        return;
+      }
+
       let endEventDate = eventEndDate.trim() || eventDate.trim();
       const startMin = parseTimeToMinutes(eventStartTime);
       const endMin = parseTimeToMinutes(eventEndTime);
@@ -883,7 +920,9 @@ export default function TripDashboardScreen() {
           originLatitude: finalOriginLat,
           originLongitude: finalOriginLon,
           address: eventAddress.trim() || undefined,
-          routePolyline: finalRoutePolyline
+          routePolyline: finalRoutePolyline,
+          hasKomootTrack,
+          komootTrackUrl: hasKomootTrack ? komootTrackUrl.trim() : undefined,
         });
       } else {
         await createEvent(
@@ -915,7 +954,9 @@ export default function TripDashboardScreen() {
           finalOriginLat,
           finalOriginLon,
           eventAddress.trim() || undefined,
-          finalRoutePolyline
+          finalRoutePolyline,
+          hasKomootTrack,
+          hasKomootTrack ? komootTrackUrl.trim() : undefined
         );
       }
 
@@ -1451,17 +1492,19 @@ export default function TripDashboardScreen() {
             </TouchableOpacity>
           ) : null}
 
-          {hasCoordinates ? (
+          {hasCoordinates || (item.hasKomootTrack && item.komootTrackUrl) ? (
             <TouchableOpacity 
               style={[
                 styles.actionBtn, 
                 styles.actionBtnSecondary,
                 { marginRight: isRTL ? 0 : 8, marginLeft: isRTL ? 8 : 0 }
               ]} 
-              onPress={() => handleNavigateKomoot(item.latitude!, item.longitude!)}
+              onPress={() => handleNavigateKomoot(item.latitude, item.longitude, item.hasKomootTrack ? item.komootTrackUrl : undefined)}
               activeOpacity={0.7}
             >
-              <Text style={[styles.actionBtnText, styles.actionBtnTextSecondary]}>🚴  {t('dashboard.komoot_map')}</Text>
+              <Text style={[styles.actionBtnText, styles.actionBtnTextSecondary]}>
+                🚴  {item.hasKomootTrack && item.komootTrackUrl ? (isRTL ? 'מסלול Komoot' : 'Komoot Track') : t('dashboard.komoot_map')}
+              </Text>
             </TouchableOpacity>
           ) : null}
 
@@ -2731,6 +2774,58 @@ export default function TripDashboardScreen() {
                   </View>
                 </View>
               )}
+
+              {/* Komoot Track Toggle & Link Input */}
+              <View style={{
+                marginBottom: 16,
+                backgroundColor: hasKomootTrack ? '#fff8f0' : '#f8f9fa',
+                padding: 14,
+                borderRadius: 12,
+                borderWidth: 1,
+                borderColor: hasKomootTrack ? '#ffd8a8' : '#dee2e6'
+              }}>
+                <View style={[rowDirectionStyle, { alignItems: 'center', justifyContent: 'space-between' }]}>
+                  <Text style={[styles.modalFormLabel, textAlignStyle, { marginBottom: 0, fontWeight: 'bold', fontSize: 14, color: '#d9480f' }]}>
+                    🚴 {isRTL ? 'מסלול Komoot' : 'Komoot Track'}
+                  </Text>
+                  <TouchableOpacity
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      backgroundColor: hasKomootTrack ? '#fd7e14' : '#ced4da',
+                      borderRadius: 20,
+                      paddingVertical: 6,
+                      paddingHorizontal: 14,
+                    }}
+                    onPress={() => {
+                      const next = !hasKomootTrack;
+                      setHasKomootTrack(next);
+                      if (!next) setKomootTrackUrl('');
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 12 }}>
+                      {hasKomootTrack ? (isRTL ? 'מופעל (ON)' : 'ON') : (isRTL ? 'כבוי (OFF)' : 'OFF')}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                {hasKomootTrack && (
+                  <View style={{ marginTop: 12 }}>
+                    <Text style={[styles.modalFormLabel, textAlignStyle, { fontSize: 12, color: '#495057' }]}>
+                      {isRTL ? 'קישור למסלול Komoot *' : 'Komoot Track Link *'}
+                    </Text>
+                    <TextInput
+                      style={[styles.modalFormInput, textAlignStyle, { backgroundColor: '#ffffff', borderColor: '#fd7e14' }]}
+                      placeholder={isRTL ? 'למשל: https://www.komoot.com/tour/12345678' : 'e.g. https://www.komoot.com/tour/12345678'}
+                      value={komootTrackUrl}
+                      onChangeText={setKomootTrackUrl}
+                      keyboardType="url"
+                      autoCapitalize="none"
+                    />
+                  </View>
+                )}
+              </View>
 
               {/* Additional Notes / Description */}
               <View style={{ marginBottom: 12 }}>

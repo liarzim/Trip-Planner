@@ -71,6 +71,8 @@ export interface Event {
   routePolyline?: string;
   transportMode?: string;
   cost?: number;
+  hasKomootTrack?: boolean;
+  komootTrackUrl?: string;
 }
 
 export interface Document {
