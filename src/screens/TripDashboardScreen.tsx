@@ -1807,7 +1807,7 @@ export default function TripDashboardScreen() {
           shadowRadius: 6,
           elevation: 2,
           height: '100%',
-          justifyContent: 'space-between',
+          justifyContent: 'flex-start',
         }}>
           {/* Header with Segmented Tab Control */}
           <View style={[rowDirectionStyle, { justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#f1f3f5', paddingBottom: 6, marginBottom: 8 }]}>
@@ -1946,7 +1946,7 @@ export default function TripDashboardScreen() {
           shadowRadius: 6,
           elevation: 2,
           height: '100%',
-          justifyContent: 'space-between',
+          justifyContent: 'flex-start',
         }}>
           <View style={[rowDirectionStyle, { justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#f1f3f5', paddingBottom: 6, marginBottom: 8 }]}>
             <View style={[rowDirectionStyle, { alignItems: 'center', flex: 1 }]}>
