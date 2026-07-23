@@ -154,6 +154,21 @@ export default function TripDashboardScreen() {
   const [isPhotoPopupVisible, setIsPhotoPopupVisible] = useState(false);
   const [popupImageUri, setPopupImageUri] = useState('');
 
+  // Hamburger Menu & Modals States
+  const [isHamburgerMenuOpen, setIsHamburgerMenuOpen] = useState(false);
+  const [isPackingModalVisible, setIsPackingModalVisible] = useState(false);
+  const [isExpensePageModalVisible, setIsExpensePageModalVisible] = useState(false);
+  const [packingItems, setPackingItems] = useState([
+    { id: '1', title: 'דרכון / תעודת זהות (Passport/ID)', checked: true },
+    { id: '2', title: 'כרטיסי טיסה ושוברים (Tickets & Vouchers)', checked: true },
+    { id: '3', title: 'מטען לטלפון ומתאם שקע (Phone Charger & Adapter)', checked: false },
+    { id: '4', title: 'ערכת עזרה ראשונה ותרופות (First Aid & Meds)', checked: false },
+    { id: '5', title: 'ביטוח נסיעות (Travel Insurance)', checked: true },
+    { id: '6', title: 'בגדים ונעליים מתאימים (Clothing & Shoes)', checked: false },
+    { id: '7', title: 'כלי רחצה וקרם הגנה (Toiletries & Sunscreen)', checked: false },
+  ]);
+  const [newPackingItemText, setNewPackingItemText] = useState('');
+
   // Flight Origin & Destination Geocoding States
   const [eventOriginAddress, setEventOriginAddress] = useState('');
   const [geocodingOriginLoading, setGeocodingOriginLoading] = useState(false);
@@ -2153,6 +2168,146 @@ export default function TripDashboardScreen() {
     );
   };
 
+  const renderPackingListModal = () => (
+    <Modal
+      visible={isPackingModalVisible}
+      transparent={true}
+      animationType="slide"
+      onRequestClose={() => setIsPackingModalVisible(false)}
+    >
+      <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+        <View style={{ width: '90%', maxWidth: 520, backgroundColor: '#ffffff', borderRadius: 16, padding: 20, maxHeight: '80%', elevation: 5 }}>
+          <View style={[rowDirectionStyle, { justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#f1f3f5', paddingBottom: 10, marginBottom: 12 }]}>
+            <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.primary }}>
+              🎒 {isRTL ? 'רשימת אריזה וציוד' : 'Packing List'}
+            </Text>
+            <TouchableOpacity onPress={() => setIsPackingModalVisible(false)} style={{ padding: 4 }}>
+              <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#868e96' }}>✕</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Add new packing item input */}
+          <View style={[rowDirectionStyle, { gap: 8, marginBottom: 12 }]}>
+            <TextInput
+              style={{ flex: 1, borderWidth: 1, borderColor: '#ced4da', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, fontSize: 13, backgroundColor: '#fff' }}
+              placeholder={isRTL ? 'הוסף פריט לציוד...' : 'Add item to packing list...'}
+              value={newPackingItemText}
+              onChangeText={setNewPackingItemText}
+            />
+            <TouchableOpacity
+              style={{ backgroundColor: colors.primary, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8, justifyContent: 'center' }}
+              onPress={() => {
+                if (newPackingItemText.trim()) {
+                  setPackingItems(prev => [...prev, { id: Date.now().toString(), title: newPackingItemText.trim(), checked: false }]);
+                  setNewPackingItemText('');
+                }
+              }}
+            >
+              <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 13 }}>+ {isRTL ? 'הוסף' : 'Add'}</Text>
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView style={{ flex: 1, marginVertical: 6 }}>
+            {packingItems.map(item => (
+              <TouchableOpacity
+                key={item.id}
+                style={[rowDirectionStyle, { alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#f8f9fa' }]}
+                onPress={() => {
+                  setPackingItems(prev => prev.map(p => p.id === item.id ? { ...p, checked: !p.checked } : p));
+                }}
+                activeOpacity={0.7}
+              >
+                <Text style={{ fontSize: 16, marginRight: isRTL ? 0 : 10, marginLeft: isRTL ? 10 : 0 }}>
+                  {item.checked ? '✅' : '⬜'}
+                </Text>
+                <Text style={{ fontSize: 13, color: item.checked ? '#868e96' : '#212529', textDecorationLine: item.checked ? 'line-through' : 'none', flex: 1 }}>
+                  {item.title}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+
+          <TouchableOpacity
+            style={{ backgroundColor: '#f1f3f5', paddingVertical: 10, borderRadius: 8, alignItems: 'center', marginTop: 10 }}
+            onPress={() => setIsPackingModalVisible(false)}
+          >
+            <Text style={{ color: '#495057', fontWeight: 'bold', fontSize: 13 }}>{isRTL ? 'סגור' : 'Close'}</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+
+  const renderExpensePageModal = () => (
+    <Modal
+      visible={isExpensePageModalVisible}
+      transparent={true}
+      animationType="slide"
+      onRequestClose={() => setIsExpensePageModalVisible(false)}
+    >
+      <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+        <View style={{ width: '90%', maxWidth: 650, backgroundColor: '#ffffff', borderRadius: 16, padding: 20, maxHeight: '85%', elevation: 5 }}>
+          <View style={[rowDirectionStyle, { justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#f1f3f5', paddingBottom: 10, marginBottom: 12 }]}>
+            <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.primary }}>
+              📊 {isRTL ? 'עמוד הוצאות מפורט' : 'Expenses & Budget Page'}
+            </Text>
+            <TouchableOpacity onPress={() => setIsExpensePageModalVisible(false)} style={{ padding: 4 }}>
+              <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#868e96' }}>✕</Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Total Spent summary */}
+          <View style={{ backgroundColor: '#1b4332', padding: 16, borderRadius: 12, marginBottom: 14, alignItems: 'center' }}>
+            <Text style={{ fontSize: 12, color: '#b7e4c7', fontWeight: 'bold' }}>
+              {isRTL ? 'סה"כ הוצאות טיול' : 'TOTAL TRIP EXPENSES'}
+            </Text>
+            <Text style={{ fontSize: 24, fontWeight: 'bold', color: '#ffffff', marginTop: 2 }}>
+              {getCurrencySymbol(tripBaseCurrency, tripCurrenciesTable)}{totalSpent.toFixed(2)} {tripBaseCurrency || 'USD'}
+            </Text>
+          </View>
+
+          <ScrollView style={{ flex: 1 }}>
+            {expenses.length === 0 ? (
+              <Text style={{ textAlign: 'center', color: '#868e96', marginVertical: 20 }}>
+                {isRTL ? 'אין הוצאות מתועדות עדיין' : 'No expenses recorded yet.'}
+              </Text>
+            ) : (
+              expenses.map(exp => (
+                <View key={exp.id} style={[rowDirectionStyle, { justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#f1f3f5' }]}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 14, fontWeight: 'bold', color: '#212529' }}>{exp.description || exp.category}</Text>
+                    <Text style={{ fontSize: 11, color: '#868e96' }}>{exp.date} • {exp.category}</Text>
+                  </View>
+                  <Text style={{ fontSize: 14, fontWeight: 'bold', color: '#2b8a3e' }}>
+                    {exp.amount} {exp.currency || tripBaseCurrency}
+                  </Text>
+                </View>
+              ))
+            )}
+          </ScrollView>
+
+          <View style={[rowDirectionStyle, { gap: 10, marginTop: 14 }]}>
+            <TouchableOpacity
+              style={{ flex: 1, backgroundColor: colors.primary, paddingVertical: 10, borderRadius: 8, alignItems: 'center' }}
+              onPress={() => {
+                setIsExpensePageModalVisible(false);
+                navigation.navigate('AddExpense', { tripId });
+              }}
+            >
+              <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 13 }}>+ {isRTL ? 'הוסף הוצאה חדשה' : 'Add New Expense'}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={{ flex: 0.6, backgroundColor: '#f1f3f5', paddingVertical: 10, borderRadius: 8, alignItems: 'center' }}
+              onPress={() => setIsExpensePageModalVisible(false)}
+            >
+              <Text style={{ color: '#495057', fontWeight: 'bold', fontSize: 13 }}>{isRTL ? 'סגור' : 'Close'}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+
   const dashboardContent = (
     <View style={styles.dashboardContainer}>
       {/* Total Spent Summary Card */}
@@ -2336,8 +2491,107 @@ export default function TripDashboardScreen() {
             <Text style={styles.settingsButtonText}>⚙️</Text>
           </TouchableOpacity>
           <LanguageSelector />
+
+          {/* Hamburger Menu Icon Button */}
+          <TouchableOpacity
+            style={{
+              backgroundColor: '#212529',
+              width: 36,
+              height: 36,
+              borderRadius: 8,
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginRight: isRTL ? 0 : 8,
+              marginLeft: isRTL ? 8 : 0,
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.2,
+              shadowRadius: 3,
+              elevation: 3,
+            }}
+            onPress={() => setIsHamburgerMenuOpen(!isHamburgerMenuOpen)}
+            activeOpacity={0.8}
+          >
+            <Text style={{ color: '#ffffff', fontSize: 18, fontWeight: 'bold' }}>☰</Text>
+          </TouchableOpacity>
         </View>
       </View>
+
+      {/* Hamburger Dropdown Menu Overlay */}
+      {isHamburgerMenuOpen && (
+        <View style={{
+          position: 'absolute',
+          top: 56,
+          right: isRTL ? 'auto' : 16,
+          left: isRTL ? 16 : 'auto',
+          zIndex: 9999,
+          backgroundColor: '#ffffff',
+          borderRadius: 12,
+          width: 220,
+          paddingVertical: 6,
+          borderWidth: 1,
+          borderColor: '#dee2e6',
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.2,
+          shadowRadius: 8,
+          elevation: 10,
+        }}>
+          <TouchableOpacity
+            style={{ paddingVertical: 10, paddingHorizontal: 14 }}
+            onPress={() => {
+              setIsHamburgerMenuOpen(false);
+              handleOpenAddEventModal();
+            }}
+          >
+            <Text style={{ fontSize: 13, fontWeight: 'bold', color: '#212529' }}>
+              📅 1. {isRTL ? 'הוסף אירוע' : 'Add Event'}
+            </Text>
+          </TouchableOpacity>
+
+          <View style={{ height: 1, backgroundColor: '#f1f3f5' }} />
+
+          <TouchableOpacity
+            style={{ paddingVertical: 10, paddingHorizontal: 14 }}
+            onPress={() => {
+              setIsHamburgerMenuOpen(false);
+              navigation.navigate('AddExpense', { tripId });
+            }}
+          >
+            <Text style={{ fontSize: 13, fontWeight: 'bold', color: '#212529' }}>
+              💰 2. {isRTL ? 'הוסף הוצאה' : 'Add Expense'}
+            </Text>
+          </TouchableOpacity>
+
+          <View style={{ height: 1, backgroundColor: '#f1f3f5' }} />
+
+          <TouchableOpacity
+            style={{ paddingVertical: 10, paddingHorizontal: 14 }}
+            onPress={() => {
+              setIsHamburgerMenuOpen(false);
+              setIsPackingModalVisible(true);
+            }}
+          >
+            <Text style={{ fontSize: 13, fontWeight: 'bold', color: '#212529' }}>
+              🎒 3. {isRTL ? 'רשימת אריזה' : 'Packing List'}
+            </Text>
+          </TouchableOpacity>
+
+          <View style={{ height: 1, backgroundColor: '#f1f3f5' }} />
+
+          <TouchableOpacity
+            style={{ paddingVertical: 10, paddingHorizontal: 14 }}
+            onPress={() => {
+              setIsHamburgerMenuOpen(false);
+              setIsExpensePageModalVisible(true);
+            }}
+          >
+            <Text style={{ fontSize: 13, fontWeight: 'bold', color: '#212529' }}>
+              📊 4. {isRTL ? 'עמוד הוצאות' : 'Expense Page'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Always Visible Persistent Trip Title & Dates Banner */}
       {tripName ? (
@@ -2423,6 +2677,12 @@ export default function TripDashboardScreen() {
 
       {/* Enlarged Photo Popup Modal */}
       {renderPhotoPopupModal()}
+
+      {/* Packing List Modal */}
+      {renderPackingListModal()}
+
+      {/* Expense Page Modal */}
+      {renderExpensePageModal()}
 
       {/* Ticket QR Code Modal */}
       <Modal
