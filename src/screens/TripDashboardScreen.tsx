@@ -1492,18 +1492,18 @@ export default function TripDashboardScreen() {
             </TouchableOpacity>
           ) : null}
 
-          {hasCoordinates || (item.hasKomootTrack && item.komootTrackUrl) ? (
+          {item.hasKomootTrack && item.komootTrackUrl ? (
             <TouchableOpacity 
               style={[
                 styles.actionBtn, 
                 styles.actionBtnSecondary,
                 { marginRight: isRTL ? 0 : 8, marginLeft: isRTL ? 8 : 0 }
               ]} 
-              onPress={() => handleNavigateKomoot(item.latitude, item.longitude, item.hasKomootTrack ? item.komootTrackUrl : undefined)}
+              onPress={() => handleNavigateKomoot(item.latitude, item.longitude, item.komootTrackUrl)}
               activeOpacity={0.7}
             >
               <Text style={[styles.actionBtnText, styles.actionBtnTextSecondary]}>
-                🚴  {item.hasKomootTrack && item.komootTrackUrl ? (isRTL ? 'מסלול Komoot' : 'Komoot Track') : t('dashboard.komoot_map')}
+                🚴  {isRTL ? 'מסלול Komoot' : 'Komoot Track'}
               </Text>
             </TouchableOpacity>
           ) : null}
