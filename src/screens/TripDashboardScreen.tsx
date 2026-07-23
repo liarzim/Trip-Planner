@@ -2610,8 +2610,115 @@ export default function TripDashboardScreen() {
             <Text style={styles.settingsButtonText}>⚙️</Text>
           </TouchableOpacity>
           <LanguageSelector />
+
+          {/* Hamburger Menu Button */}
+          <TouchableOpacity
+            style={{
+              backgroundColor: '#1b4332',
+              paddingHorizontal: 12,
+              paddingVertical: 6,
+              borderRadius: 8,
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginLeft: isRTL ? 0 : 8,
+              marginRight: isRTL ? 8 : 0,
+              elevation: 2,
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 1 },
+              shadowOpacity: 0.1,
+              shadowRadius: 2,
+            }}
+            onPress={() => setIsHamburgerMenuOpen(!isHamburgerMenuOpen)}
+            activeOpacity={0.8}
+          >
+            <Text style={{ color: '#ffffff', fontSize: 16, fontWeight: 'bold' }}>☰</Text>
+          </TouchableOpacity>
         </View>
       </View>
+
+      {/* Hamburger Dropdown Menu Overlay (RTL-compatible) */}
+      {isHamburgerMenuOpen && (
+        <View style={{
+          position: 'absolute',
+          top: 56,
+          right: isRTL ? 16 : 'auto',
+          left: isRTL ? 'auto' : 16,
+          zIndex: 9999,
+          backgroundColor: '#ffffff',
+          borderRadius: 14,
+          width: 230,
+          paddingVertical: 6,
+          borderWidth: 1,
+          borderColor: '#dee2e6',
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.2,
+          shadowRadius: 10,
+          elevation: 10,
+        }}>
+          <TouchableOpacity
+            style={[rowDirectionStyle, { paddingVertical: 12, paddingHorizontal: 16, alignItems: 'center' }]}
+            onPress={() => {
+              setIsHamburgerMenuOpen(false);
+              handleOpenAddEventModal();
+            }}
+            activeOpacity={0.7}
+          >
+            <Text style={{ fontSize: 16, marginRight: isRTL ? 0 : 10, marginLeft: isRTL ? 10 : 0 }}>📅</Text>
+            <Text style={{ fontSize: 13, fontWeight: 'bold', color: '#212529', textAlign: isRTL ? 'right' : 'left', flex: 1 }}>
+              {isRTL ? '1. הוסף אירוע' : '1. Add Event'}
+            </Text>
+          </TouchableOpacity>
+
+          <View style={{ height: 1, backgroundColor: '#f1f3f5', marginHorizontal: 12 }} />
+
+          <TouchableOpacity
+            style={[rowDirectionStyle, { paddingVertical: 12, paddingHorizontal: 16, alignItems: 'center' }]}
+            onPress={() => {
+              setIsHamburgerMenuOpen(false);
+              navigation.navigate('AddExpense', { tripId });
+            }}
+            activeOpacity={0.7}
+          >
+            <Text style={{ fontSize: 16, marginRight: isRTL ? 0 : 10, marginLeft: isRTL ? 10 : 0 }}>💰</Text>
+            <Text style={{ fontSize: 13, fontWeight: 'bold', color: '#212529', textAlign: isRTL ? 'right' : 'left', flex: 1 }}>
+              {isRTL ? '2. הוסף הוצאה' : '2. Add Expense'}
+            </Text>
+          </TouchableOpacity>
+
+          <View style={{ height: 1, backgroundColor: '#f1f3f5', marginHorizontal: 12 }} />
+
+          <TouchableOpacity
+            style={[rowDirectionStyle, { paddingVertical: 12, paddingHorizontal: 16, alignItems: 'center' }]}
+            onPress={() => {
+              setIsHamburgerMenuOpen(false);
+              setIsPackingModalVisible(true);
+            }}
+            activeOpacity={0.7}
+          >
+            <Text style={{ fontSize: 16, marginRight: isRTL ? 0 : 10, marginLeft: isRTL ? 10 : 0 }}>🎒</Text>
+            <Text style={{ fontSize: 13, fontWeight: 'bold', color: '#212529', textAlign: isRTL ? 'right' : 'left', flex: 1 }}>
+              {isRTL ? '3. רשימת אריזה' : '3. Packing List'}
+            </Text>
+          </TouchableOpacity>
+
+          <View style={{ height: 1, backgroundColor: '#f1f3f5', marginHorizontal: 12 }} />
+
+          <TouchableOpacity
+            style={[rowDirectionStyle, { paddingVertical: 12, paddingHorizontal: 16, alignItems: 'center' }]}
+            onPress={() => {
+              setIsHamburgerMenuOpen(false);
+              setIsExpensePageModalVisible(true);
+            }}
+            activeOpacity={0.7}
+          >
+            <Text style={{ fontSize: 16, marginRight: isRTL ? 0 : 10, marginLeft: isRTL ? 10 : 0 }}>📊</Text>
+            <Text style={{ fontSize: 13, fontWeight: 'bold', color: '#212529', textAlign: isRTL ? 'right' : 'left', flex: 1 }}>
+              {isRTL ? '4. עמוד הוצאות' : '4. Expense Page'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       {/* Always Visible Persistent Trip Title & Dates Banner (Mobile only) */}
       {!isWeb && tripName ? (
