@@ -1707,52 +1707,34 @@ export default function TripDashboardScreen() {
     const hasQr = targetEvent.hasQrCode && (targetEvent.qrCodeUrl || targetEvent.bookingReference);
 
     return (
-      <View style={{
-        marginTop: 12,
-        backgroundColor: '#ffffff',
-        borderRadius: 16,
-        padding: 14,
-        borderWidth: 1,
-        borderColor: '#ced4da',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 6,
-        elevation: 3,
-      }}>
-        <View style={[rowDirectionStyle, { justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, borderBottomWidth: 1, borderBottomColor: '#f1f3f5', paddingBottom: 8 }]}>
-          <View style={[rowDirectionStyle, { alignItems: 'center', flex: 1 }]}>
-            <Text style={{ fontSize: 16, fontWeight: 'bold', color: colors.primary }}>
-              {targetEvent.title}
+      <View style={{ flexDirection: 'row', gap: 12, marginTop: 14, width: '100%', alignItems: 'stretch' }}>
+        {/* Box 1 (Left Box): QR Code / Picture Gallery */}
+        <View style={{
+          flex: 1,
+          backgroundColor: '#ffffff',
+          borderRadius: 16,
+          padding: 14,
+          borderWidth: 1,
+          borderColor: '#ced4da',
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.08,
+          shadowRadius: 6,
+          elevation: 2,
+          minHeight: 180,
+        }}>
+          <View style={[rowDirectionStyle, { justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#f1f3f5', paddingBottom: 6, marginBottom: 8 }]}>
+            <Text style={{ fontSize: 13, fontWeight: 'bold', color: '#495057' }}>
+              📷 {isRTL ? 'קוד QR / גלריית תמונות' : 'QR CODE / Picture Gallery'}
             </Text>
-            <View style={[styles.badge, { backgroundColor: '#e7f5ff', marginLeft: 8, marginRight: 8 }]}>
-              <Text style={[styles.badgeText, { color: colors.primary }]}>
-                {targetEvent.type.toUpperCase()}
-              </Text>
-            </View>
+            {selectedEventForMap && (
+              <TouchableOpacity onPress={() => setSelectedEventForMap(null)} style={{ padding: 2 }}>
+                <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#868e96' }}>✕</Text>
+              </TouchableOpacity>
+            )}
           </View>
-          {selectedEventForMap && (
-            <TouchableOpacity onPress={() => setSelectedEventForMap(null)} style={{ padding: 4 }}>
-              <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#868e96' }}>✕</Text>
-            </TouchableOpacity>
-          )}
-        </View>
 
-        <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', alignItems: 'flex-start' }}>
-          {/* Left Side: QR Code Image / Code */}
-          <View style={{
-            width: 120,
-            height: 120,
-            backgroundColor: '#f8f9fa',
-            borderRadius: 12,
-            borderWidth: 1,
-            borderColor: '#dee2e6',
-            justifyContent: 'center',
-            alignItems: 'center',
-            marginRight: isRTL ? 0 : 12,
-            marginLeft: isRTL ? 12 : 0,
-            padding: 4
-          }}>
+          <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', padding: 4 }}>
             {hasQr ? (
               <TouchableOpacity 
                 style={{ width: '100%', height: '100%', justifyContent: 'center', alignItems: 'center' }}
@@ -1763,63 +1745,128 @@ export default function TripDashboardScreen() {
                 activeOpacity={0.8}
               >
                 {isImageQr(targetEvent.qrCodeUrl) ? (
-                  <Image source={{ uri: targetEvent.qrCodeUrl }} style={{ width: 110, height: 110, borderRadius: 8 }} resizeMode="contain" />
+                  <Image source={{ uri: targetEvent.qrCodeUrl }} style={{ width: '100%', height: 130, borderRadius: 10 }} resizeMode="contain" />
                 ) : (
                   <View style={{ alignItems: 'center', justifyContent: 'center' }}>
                     {targetEvent.qrCodeUrl || targetEvent.bookingReference ? (
-                      <QRCode value={targetEvent.qrCodeUrl || targetEvent.bookingReference} size={90} />
-                    ) : (
-                      <>
-                        <Text style={{ fontSize: 36 }}>🎫</Text>
-                        <Text style={{ fontSize: 10, fontWeight: 'bold', color: colors.primary, marginTop: 4 }}>
-                          {isRTL ? 'הצג קוד QR' : 'View QR'}
-                        </Text>
-                      </>
-                    )}
+                      <QRCode value={targetEvent.qrCodeUrl || targetEvent.bookingReference} size={110} />
+                    ) : null}
                   </View>
                 )}
               </TouchableOpacity>
             ) : (
-              <View style={{ alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-                <Text style={{ fontSize: 32, opacity: 0.3 }}>📍</Text>
-                <Text style={{ fontSize: 10, color: '#adb5bd', marginTop: 4, fontWeight: 'bold' }}>
-                  {isRTL ? 'אין קוד QR' : 'No QR Code'}
+              <View style={{ alignItems: 'center', justifyContent: 'center', opacity: 0.6, paddingVertical: 10 }}>
+                <Text style={{ fontSize: 36, marginBottom: 4 }}>📷</Text>
+                <Text style={{ fontSize: 12, color: '#868e96', textAlign: 'center', fontWeight: '500' }}>
+                  {isRTL ? 'אין קוד QR / תמונה מצורפת' : 'No QR Code or Image attached'}
                 </Text>
               </View>
             )}
           </View>
+        </View>
 
-          {/* Main / Right Side: Event Details */}
-          <View style={{ flex: 1, justifyContent: 'center' }}>
-            <Text style={[textAlignStyle, { fontSize: 13, color: '#495057', fontWeight: 'bold', marginBottom: 6 }]}>
-              ⏰  {formatTimeByPreference(targetEvent.startTime, tripTimeFormat)} {targetEvent.endTime ? (isRTL ? `עד ${formatTimeByPreference(targetEvent.endTime, tripTimeFormat)}` : `to ${formatTimeByPreference(targetEvent.endTime, tripTimeFormat)}`) : ''}
+        {/* Box 2 (Right Box): Event Details */}
+        <View style={{
+          flex: 1.2,
+          backgroundColor: '#ffffff',
+          borderRadius: 16,
+          padding: 14,
+          borderWidth: 1,
+          borderColor: '#1971c2',
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.08,
+          shadowRadius: 6,
+          elevation: 2,
+          minHeight: 180,
+          justifyContent: 'space-between',
+        }}>
+          <View style={[rowDirectionStyle, { justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#f1f3f5', paddingBottom: 6, marginBottom: 8 }]}>
+            <View style={[rowDirectionStyle, { alignItems: 'center', flex: 1 }]}>
+              <Text style={{ fontSize: 16, fontWeight: 'bold', color: colors.primary, marginRight: 6 }}>
+                {targetEvent.title}
+              </Text>
+              <View style={[styles.badge, { backgroundColor: '#e7f5ff', paddingHorizontal: 6, paddingVertical: 2 }]}>
+                <Text style={[styles.badgeText, { color: colors.primary, fontSize: 10 }]}>
+                  {targetEvent.type.toUpperCase()}
+                </Text>
+              </View>
+            </View>
+            {selectedEventForMap && (
+              <TouchableOpacity onPress={() => setSelectedEventForMap(null)} style={{ padding: 2 }}>
+                <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#868e96' }}>✕</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          <View style={{ gap: 6 }}>
+            <Text style={{ fontSize: 12, color: '#343a40', fontWeight: '500' }}>
+              ⏰  {formatTimeByPreference(targetEvent.startTime, tripTimeFormat)}
+              {targetEvent.endTime ? ` — ${formatTimeByPreference(targetEvent.endTime, tripTimeFormat)}` : ''}
             </Text>
 
             {targetEvent.address ? (
-              <Text style={[textAlignStyle, { fontSize: 12, color: '#495057', marginBottom: 4 }]} numberOfLines={2}>
+              <Text style={{ fontSize: 12, color: '#495057', fontWeight: '500' }} numberOfLines={1}>
                 📍 {targetEvent.address}
               </Text>
             ) : null}
 
             {typeof targetEvent.cost === 'number' && (
-              <Text style={[textAlignStyle, { fontSize: 12, fontWeight: 'bold', color: '#2b8a3e', marginBottom: 4 }]}>
-                💰 {targetEvent.cost.toFixed(2)} {tripBaseCurrency}
-              </Text>
+              <View style={[rowDirectionStyle, { alignItems: 'center' }]}>
+                <Text style={{ fontSize: 14, fontWeight: 'bold', color: '#2b8a3e' }}>
+                  💰 {targetEvent.cost.toFixed(2)} {tripBaseCurrency}
+                </Text>
+                {typeof tripExchangeRate === 'number' && (
+                  <Text style={{ fontSize: 11, color: '#868e96', marginLeft: 6, marginRight: 6 }}>
+                    (₪{(targetEvent.cost * tripExchangeRate).toFixed(2)})
+                  </Text>
+                )}
+              </View>
             )}
 
             {targetEvent.description ? (
-              <Text style={[textAlignStyle, { fontSize: 12, color: '#666', marginTop: 2 }]} numberOfLines={3}>
+              <Text style={{ fontSize: 11, color: '#6c757d', fontStyle: 'italic' }} numberOfLines={2}>
                 📝 {targetEvent.description}
               </Text>
             ) : null}
+          </View>
 
+          <View style={[rowDirectionStyle, { gap: 8, marginTop: 8 }]}>
             {targetEvent.hasKomootTrack && targetEvent.komootTrackUrl ? (
               <TouchableOpacity 
-                style={{ marginTop: 8, backgroundColor: '#fff8f0', borderColor: '#fd7e14', borderWidth: 1, paddingVertical: 5, paddingHorizontal: 10, borderRadius: 8, alignSelf: isRTL ? 'flex-end' : 'flex-start' }}
+                style={{
+                  backgroundColor: '#e67700',
+                  paddingVertical: 5,
+                  paddingHorizontal: 10,
+                  borderRadius: 6,
+                  alignItems: 'center',
+                }}
                 onPress={() => handleNavigateKomoot(targetEvent.latitude, targetEvent.longitude, targetEvent.komootTrackUrl)}
+                activeOpacity={0.8}
               >
-                <Text style={{ fontSize: 11, fontWeight: 'bold', color: '#d9480f' }}>
+                <Text style={{ color: '#ffffff', fontSize: 11, fontWeight: 'bold' }}>
                   🚴 {isRTL ? 'מסלול Komoot' : 'Komoot Track'}
+                </Text>
+              </TouchableOpacity>
+            ) : null}
+
+            {hasQr ? (
+              <TouchableOpacity 
+                style={{
+                  backgroundColor: '#1971c2',
+                  paddingVertical: 5,
+                  paddingHorizontal: 10,
+                  borderRadius: 6,
+                  alignItems: 'center',
+                }}
+                onPress={() => {
+                  setSelectedBookingRef(targetEvent.qrCodeUrl || targetEvent.bookingReference!);
+                  setIsQrModalVisible(true);
+                }}
+                activeOpacity={0.8}
+              >
+                <Text style={{ color: '#ffffff', fontSize: 11, fontWeight: 'bold' }}>
+                  🎫 {isRTL ? 'הצג קוד QR' : 'View QR Code'}
                 </Text>
               </TouchableOpacity>
             ) : null}
@@ -2039,29 +2086,29 @@ export default function TripDashboardScreen() {
       )}
 
       {isWeb ? (
-        <View style={[styles.webSplitLayout, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
+        <View style={styles.webSplitLayout}>
+          <View style={styles.webMapColumn}>
+            <DashboardMap events={events} focusedEventId={focusedEventId} onSelectEvent={setSelectedEventForMap} />
+            {renderSelectedEventDetailUnderMap()}
+          </View>
           <View style={styles.webDashboardColumn}>
             {dashboardContent}
             <View style={[styles.webButtonRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
-              <TouchableOpacity 
-                style={[styles.webActionBtn, styles.eventButton]}
-                onPress={handleOpenAddEventModal}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.buttonText}>{t('dashboard.add_event')}</Text>
-              </TouchableOpacity>
               <TouchableOpacity 
                 style={[styles.webActionBtn, styles.expenseButton]}
                 onPress={() => navigation.navigate('AddExpense', { tripId })}
                 activeOpacity={0.8}
               >
-                <Text style={styles.buttonText}>{t('dashboard.add_expense')}</Text>
+                <Text style={styles.buttonText}>+ {isRTL ? 'הוסף הוצאה' : 'Add Expense'}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.webActionBtn, styles.eventButton]}
+                onPress={handleOpenAddEventModal}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.buttonText}>+ {isRTL ? 'הוסף אירוע' : 'Add Event'}</Text>
               </TouchableOpacity>
             </View>
-          </View>
-          <View style={styles.webMapColumn}>
-            <DashboardMap events={events} focusedEventId={focusedEventId} onSelectEvent={setSelectedEventForMap} />
-            {renderSelectedEventDetailUnderMap()}
           </View>
         </View>
       ) : (
@@ -3647,19 +3694,19 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   webDashboardColumn: {
-    width: '40%',
-    minWidth: 420,
+    width: '38%',
+    minWidth: 380,
     maxWidth: 500,
-    borderRightWidth: 1,
-    borderRightColor: colors.border,
+    borderLeftWidth: 1,
+    borderLeftColor: colors.border,
     height: '100%',
     backgroundColor: colors.white,
   },
   webMapColumn: {
-    flex: 1,
+    flex: 1.6,
     height: '100%',
     padding: 16,
-    backgroundColor: '#f1f3f5',
+    backgroundColor: '#f8f9fa',
   },
   dashboardContainer: {
     flex: 1,
