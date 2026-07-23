@@ -297,7 +297,8 @@ export default function TripDashboardScreen() {
     }
   };
 
-  const toggleHotelAccordion = (id: string) => {
+  const toggleHotelAccordion = (id: string, item?: Event) => {
+    if (item) setSelectedEventForMap(item);
     setExpandedHotelIds((prev) => ({
       ...prev,
       [id]: !prev[id],
@@ -979,6 +980,13 @@ export default function TripDashboardScreen() {
       const updatedEvents = await getEventsForTrip(tripId);
       setEvents(updatedEvents);
 
+      if (editingEventId) {
+        const target = updatedEvents.find(e => e.id === editingEventId);
+        if (target) setSelectedEventForMap(target);
+      } else if (updatedEvents.length > 0) {
+        setSelectedEventForMap(updatedEvents[updatedEvents.length - 1]);
+      }
+
       setIsAddEventModalVisible(false);
     } catch (err: any) {
       setEventFormError(err.message || 'Failed to save event.');
@@ -1210,9 +1218,21 @@ export default function TripDashboardScreen() {
     const isFlight = item.type === 'flight';
     const isHotel = item.type === 'hotel';
     const isWaypoint = item.type === 'waypoint';
+    const isSelected = (selectedEventForMap?.id === item.id) || (focusedEventId === item.id);
 
     return (
-      <View style={[styles.eventCard, { alignItems: isRTL ? 'flex-end' : 'flex-start' }]}>
+      <TouchableOpacity 
+        style={[
+          styles.eventCard, 
+          { alignItems: isRTL ? 'flex-end' : 'flex-start' },
+          isSelected ? { borderColor: '#1971c2', borderWidth: 2, backgroundColor: '#f8f9fa' } : null
+        ]}
+        onPress={() => {
+          setSelectedEventForMap(item);
+          setFocusedEventId(item.id);
+        }}
+        activeOpacity={0.95}
+      >
         {isFlight ? (
           isWeb ? (
             <View style={[styles.webFlightRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
@@ -1305,7 +1325,7 @@ export default function TripDashboardScreen() {
             <View style={styles.webHotelContainer}>
               <TouchableOpacity
                 style={[styles.webHotelHeader, rowDirectionStyle]}
-                onPress={() => toggleHotelAccordion(item.id)}
+                onPress={() => toggleHotelAccordion(item.id, item)}
                 activeOpacity={0.7}
               >
                 <View style={[rowDirectionStyle, { alignItems: 'center' }]}>
@@ -1548,7 +1568,7 @@ export default function TripDashboardScreen() {
             <Text style={styles.eventDeleteActionText}>🗑️  {isRTL ? 'מחק' : 'Delete'}</Text>
           </TouchableOpacity>
         </View>
-      </View>
+      </TouchableOpacity>
     );
   };
 
