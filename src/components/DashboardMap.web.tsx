@@ -54,7 +54,9 @@ interface DashboardMapProps {
   onClose?: () => void;
 }
 
-export default function DashboardMap({ events, onSelectEvent }: DashboardMapProps) {
+export default function DashboardMap({ events, focusedEventId, onSelectEvent }: DashboardMapProps) {
+  const iframeRef = React.useRef<HTMLIFrameElement>(null);
+
   React.useEffect(() => {
     const handleMessage = (evt: MessageEvent) => {
       if (evt.data && evt.data.type === 'SELECT_EVENT' && onSelectEvent) {
@@ -67,6 +69,21 @@ export default function DashboardMap({ events, onSelectEvent }: DashboardMapProp
       return () => window.removeEventListener('message', handleMessage);
     }
   }, [events, onSelectEvent]);
+
+  React.useEffect(() => {
+    if (focusedEventId && iframeRef.current && iframeRef.current.contentWindow) {
+      const match = events.find(e => e.id === focusedEventId);
+      if (match && typeof match.latitude === 'number' && typeof match.longitude === 'number') {
+        iframeRef.current.contentWindow.postMessage({
+          type: 'CENTER_MAP',
+          lat: match.latitude,
+          lon: match.longitude,
+          zoom: 14,
+          id: match.id
+        }, '*');
+      }
+    }
+  }, [focusedEventId, events]);
 
   const markerItems: string[] = [];
   const arcItems: string[] = [];
@@ -96,6 +113,7 @@ export default function DashboardMap({ events, onSelectEvent }: DashboardMapProp
               window.parent.postMessage({ type: 'SELECT_EVENT', id: '${item.id}' }, '*');
             }
           });
+          markersMap['${item.id}'] = m;
           bounds.push([${lat}, ${lon}]);
         })();
       `);
@@ -180,6 +198,7 @@ export default function DashboardMap({ events, onSelectEvent }: DashboardMapProp
         }).addTo(map);
 
         var bounds = [];
+        var markersMap = {};
 
         ${markerItems.join('\n')}
         ${arcItems.join('\n')}
@@ -189,6 +208,15 @@ export default function DashboardMap({ events, onSelectEvent }: DashboardMapProp
         } else {
           map.setView([32.0094, 34.8769], 4);
         }
+
+        window.addEventListener('message', function(evt) {
+          if (evt.data && evt.data.type === 'CENTER_MAP') {
+            map.setView([evt.data.lat, evt.data.lon], evt.data.zoom || 14);
+            if (markersMap[evt.data.id]) {
+              markersMap[evt.data.id].openPopup();
+            }
+          }
+        });
       </script>
     </body>
     </html>
@@ -197,6 +225,7 @@ export default function DashboardMap({ events, onSelectEvent }: DashboardMapProp
   return (
     <View style={styles.container}>
       {React.createElement('iframe', {
+        ref: iframeRef,
         srcDoc: mapHtml,
         style: {
           width: '100%',
