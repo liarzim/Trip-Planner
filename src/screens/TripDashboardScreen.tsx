@@ -697,9 +697,9 @@ export default function TripDashboardScreen() {
     setEventQrCodeUrl(item.qrCodeUrl || '');
     setEventTransportMode((item.transportMode as 'driving' | 'transit') || '');
     setEventCost(item.cost !== undefined ? item.cost.toString() : '');
-    setHasKomootTrack(!!item.hasKomootTrack);
+    setHasKomootTrack(!!item.hasKomootTrack && !!item.komootTrackUrl);
     setKomootTrackUrl(item.komootTrackUrl || '');
-    setHasQrCode(!!item.hasQrCode || !!item.qrCodeUrl || !!item.bookingReference);
+    setHasQrCode(!!item.hasQrCode || !!item.qrCodeUrl);
     setGeocodingSuccessMsg('');
     setGeocodingOriginSuccessMsg('');
     setGeocodingDestSuccessMsg('');
