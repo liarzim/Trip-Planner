@@ -178,6 +178,9 @@ export default function TripDashboardScreen() {
   const [geocodingDestLoading, setGeocodingDestLoading] = useState(false);
   const [geocodingDestSuccessMsg, setGeocodingDestSuccessMsg] = useState('');
 
+  // Date Accordion Collapse State
+  const [collapsedDates, setCollapsedDates] = useState<Record<string, boolean>>({});
+
   const isImageQr = (val?: string | null): boolean => {
     if (!val) return false;
     return (
@@ -1593,6 +1596,151 @@ export default function TripDashboardScreen() {
     );
   };
 
+  // Date and Time Grouping & Sorting Utilities
+  const getEventDateKey = (event: Event): string => {
+    if (event.startTime && event.startTime.includes(' ')) {
+      return event.startTime.split(' ')[0];
+    }
+    if (event.startTime && event.startTime.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      return event.startTime;
+    }
+    if (event.departureTime && event.departureTime.includes(' ')) {
+      return event.departureTime.split(' ')[0];
+    }
+    return tripStartDate || 'Undated';
+  };
+
+  const getEventTimeSortValue = (event: Event): number => {
+    let timeStr = '';
+    if (event.startTime && event.startTime.includes(' ')) {
+      timeStr = event.startTime.split(' ')[1];
+    } else if (event.departureTime) {
+      timeStr = event.departureTime;
+    } else if (event.checkInTime) {
+      timeStr = event.checkInTime;
+    }
+    if (!timeStr) return 0;
+    const match = timeStr.match(/^(\d{1,2}):(\d{2})/);
+    if (match) {
+      return parseInt(match[1], 10) * 60 + parseInt(match[2], 10);
+    }
+    return 0;
+  };
+
+  const formatDateHeader = (dateStr: string): string => {
+    if (dateStr === 'Undated') return isRTL ? 'ללא תאריך' : 'Undated';
+    try {
+      const [year, month, day] = dateStr.split('-').map(Number);
+      const date = new Date(year, month - 1, day);
+      if (isNaN(date.getTime())) return dateStr;
+      
+      const options: Intl.DateTimeFormatOptions = { 
+        weekday: 'long', 
+        day: 'numeric', 
+        month: 'short', 
+        year: 'numeric' 
+      };
+      return date.toLocaleDateString(isRTL ? 'he-IL' : 'en-US', options);
+    } catch (e) {
+      return dateStr;
+    }
+  };
+
+  const groupedEvents = React.useMemo(() => {
+    const sorted = [...events].sort((a, b) => {
+      const dateA = getEventDateKey(a);
+      const dateB = getEventDateKey(b);
+      if (dateA !== dateB) {
+        return dateA.localeCompare(dateB);
+      }
+      return getEventTimeSortValue(a) - getEventTimeSortValue(b);
+    });
+
+    const groups: { dateKey: string; items: Event[] }[] = [];
+    sorted.forEach((event) => {
+      const dateKey = getEventDateKey(event);
+      let group = groups.find((g) => g.dateKey === dateKey);
+      if (!group) {
+        group = { dateKey, items: [] };
+        groups.push(group);
+      }
+      group.items.push(event);
+    });
+
+    return groups;
+  }, [events, tripStartDate, isRTL]);
+
+  const renderDateSection = ({ item }: { item: { dateKey: string; items: Event[] } }) => {
+    const isCollapsed = !!collapsedDates[item.dateKey];
+    const formattedDate = formatDateHeader(item.dateKey);
+
+    return (
+      <View key={item.dateKey} style={{ marginBottom: 14 }}>
+        {/* Date Section Header Bar */}
+        <TouchableOpacity
+          style={[
+            rowDirectionStyle,
+            {
+              backgroundColor: '#e8f5e9',
+              borderRadius: 10,
+              paddingHorizontal: 14,
+              paddingVertical: 10,
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: isCollapsed ? 0 : 10,
+              borderLeftWidth: isRTL ? 0 : 4,
+              borderRightWidth: isRTL ? 4 : 0,
+              borderColor: '#1b4332',
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 1 },
+              shadowOpacity: 0.05,
+              shadowRadius: 2,
+              elevation: 1,
+            }
+          ]}
+          onPress={() => {
+            setCollapsedDates((prev) => ({
+              ...prev,
+              [item.dateKey]: !prev[item.dateKey],
+            }));
+          }}
+          activeOpacity={0.8}
+        >
+          <View style={[rowDirectionStyle, { alignItems: 'center', gap: 10 }]}>
+            <Text style={{ fontSize: 14, color: '#1b4332', fontWeight: 'bold' }}>
+              📅  {formattedDate}
+            </Text>
+            <View style={{
+              backgroundColor: '#1b4332',
+              paddingHorizontal: 10,
+              paddingVertical: 2,
+              borderRadius: 12,
+            }}>
+              <Text style={{ fontSize: 11, fontWeight: 'bold', color: '#ffffff' }}>
+                {item.items.length} {isRTL ? (item.items.length === 1 ? 'אירוע' : 'אירועים') : (item.items.length === 1 ? 'event' : 'events')}
+              </Text>
+            </View>
+          </View>
+
+          <Text style={{ fontSize: 14, color: '#1b4332', fontWeight: 'bold' }}>
+            {isCollapsed ? (isRTL ? '◀' : '▶') : '▼'}
+          </Text>
+        </TouchableOpacity>
+
+        {/* Event Cards under this Date Section */}
+        {!isCollapsed && (
+          <View style={{ gap: 10 }}>
+            {item.items.map((eventItem) => (
+              <React.Fragment key={eventItem.id}>
+                {renderEventItem({ item: eventItem })}
+              </React.Fragment>
+            ))}
+          </View>
+        )}
+      </View>
+    );
+  };
+
   const renderFooter = () => {
     const rowDirectionStyle = { flexDirection: (isRTL ? 'row-reverse' : 'row') as 'row' | 'row-reverse' };
     const textAlignStyle = { textAlign: (isRTL ? 'right' : 'left') as 'left' | 'right' };
@@ -2478,9 +2626,9 @@ export default function TripDashboardScreen() {
         </View>
       ) : (
         <FlatList
-          data={events}
-          keyExtractor={(item) => item.id}
-          renderItem={renderEventItem}
+          data={groupedEvents}
+          keyExtractor={(item) => item.dateKey}
+          renderItem={renderDateSection}
           contentContainerStyle={styles.listContainer}
           ListFooterComponent={renderFooter}
           ListEmptyComponent={
@@ -2763,9 +2911,9 @@ export default function TripDashboardScreen() {
             <View style={styles.webDashboardColumn}>
               <View style={{ flex: 1, overflow: 'hidden' }}>
                 <FlatList
-                  data={events}
-                  keyExtractor={(item) => item.id}
-                  renderItem={renderEventItem}
+                  data={groupedEvents}
+                  keyExtractor={(item) => item.dateKey}
+                  renderItem={renderDateSection}
                   contentContainerStyle={styles.listContainer}
                   showsVerticalScrollIndicator={true}
                   ListEmptyComponent={
