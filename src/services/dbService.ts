@@ -574,11 +574,12 @@ export const getTrip = async (tripId: string): Promise<Trip | null> => {
     timeFormat: data.timeFormat || '24h',
     currenciesTable: data.currenciesTable || undefined,
     packingCategories: data.packingCategories && Array.isArray(data.packingCategories) && data.packingCategories.length > 0 ? data.packingCategories : DEFAULT_PACKING_CATEGORIES,
+    participants: data.participants && Array.isArray(data.participants) ? data.participants : [],
   } as Trip;
 };
 
 /**
- * Updates the currency settings, time format, custom currency table, and packing categories for a specific trip in Firestore.
+ * Updates the currency settings, time format, custom currency table, packing categories, and participants for a specific trip in Firestore.
  */
 export const updateTripSettings = async (
   tripId: string,
@@ -586,7 +587,8 @@ export const updateTripSettings = async (
   exchangeRateToILS: number,
   timeFormat?: '24h' | '12h',
   currenciesTable?: any[],
-  packingCategories?: string[]
+  packingCategories?: string[],
+  participants?: string[]
 ): Promise<void> => {
   const tripDocRef = doc(db, 'trips', tripId);
   const data: any = {
@@ -596,6 +598,7 @@ export const updateTripSettings = async (
   if (timeFormat) data.timeFormat = timeFormat;
   if (currenciesTable) data.currenciesTable = currenciesTable;
   if (packingCategories) data.packingCategories = packingCategories;
+  if (participants) data.participants = participants;
   await updateDoc(tripDocRef, data);
 };
 

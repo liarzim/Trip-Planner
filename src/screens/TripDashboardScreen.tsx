@@ -206,6 +206,7 @@ export default function TripDashboardScreen() {
   // Packing List & Categories States
   const [dbPackingItems, setDbPackingItems] = useState<PackingItem[]>([]);
   const [tripPackingCategories, setTripPackingCategories] = useState<string[]>(DEFAULT_PACKING_CATEGORIES);
+  const [tripParticipants, setTripParticipants] = useState<string[]>([]);
   const [selectedAddCategory, setSelectedAddCategory] = useState<string>('');
   const [collapsedPackingCategories, setCollapsedPackingCategories] = useState<Record<string, boolean>>({});
   const [isAddingCategoryInline, setIsAddingCategoryInline] = useState(false);
@@ -472,6 +473,11 @@ export default function TripDashboardScreen() {
               }
               if (fetchedTrip.currenciesTable && Array.isArray(fetchedTrip.currenciesTable)) {
                 setTripCurrenciesTable(fetchedTrip.currenciesTable);
+              }
+              if (fetchedTrip.participants && Array.isArray(fetchedTrip.participants)) {
+                setTripParticipants(fetchedTrip.participants);
+              } else {
+                setTripParticipants([]);
               }
             }
             
@@ -2417,18 +2423,41 @@ export default function TripDashboardScreen() {
   };
 
   const renderPackingListModal = () => {
-    const categoriesToUse = tripPackingCategories && tripPackingCategories.length > 0
+    const rawCategories = tripPackingCategories && tripPackingCategories.length > 0
       ? tripPackingCategories
       : DEFAULT_PACKING_CATEGORIES;
+
+    const categoriesToUse: string[] = [];
+    rawCategories.forEach(cat => {
+      if (cat.includes('בגדים לפי משתתף') || cat.toLowerCase().includes('clothes by person')) {
+        if (tripParticipants.length > 0) {
+          tripParticipants.forEach(person => {
+            const pCat = `👥 בגדים לפי משתתף (${person})`;
+            if (!categoriesToUse.includes(pCat)) {
+              categoriesToUse.push(pCat);
+            }
+          });
+        } else {
+          categoriesToUse.push(cat);
+        }
+      } else {
+        if (!categoriesToUse.includes(cat)) {
+          categoriesToUse.push(cat);
+        }
+      }
+    });
 
     // Group items by category
     const itemsByCategory: Record<string, PackingItem[]> = {};
     categoriesToUse.forEach(cat => {
       itemsByCategory[cat] = [];
     });
-    // Add items whose category might be custom
+    // Add items whose category might be custom or match participant
     dbPackingItems.forEach(item => {
-      const cat = item.category || DEFAULT_PACKING_CATEGORIES[5];
+      let cat = item.category || DEFAULT_PACKING_CATEGORIES[5];
+      if ((cat === '👥 בגדים לפי משתתף' || cat === 'בגדים לפי משתתף') && tripParticipants.length > 0) {
+        cat = `👥 בגדים לפי משתתף (${tripParticipants[0]})`;
+      }
       if (!itemsByCategory[cat]) {
         itemsByCategory[cat] = [];
       }

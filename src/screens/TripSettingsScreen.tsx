@@ -40,6 +40,10 @@ export default function TripSettingsScreen() {
   const [packingCategories, setPackingCategories] = useState<string[]>(DEFAULT_PACKING_CATEGORIES);
   const [newCategoryText, setNewCategoryText] = useState('');
 
+  // Trip Participants state
+  const [participants, setParticipants] = useState<string[]>([]);
+  const [newParticipantText, setNewParticipantText] = useState('');
+
   // Currency Table state
   const [currenciesList, setCurrenciesList] = useState<CurrencyRowItem[]>(SUPPORTED_CURRENCIES);
   const [selectedCurrencyCode, setSelectedCurrencyCode] = useState('USD');
@@ -82,6 +86,9 @@ export default function TripSettingsScreen() {
           } else {
             setPackingCategories(DEFAULT_PACKING_CATEGORIES);
           }
+          if (trip.participants && Array.isArray(trip.participants)) {
+            setParticipants(trip.participants);
+          }
         }
       } catch (err) {
         console.error('Failed to load trip settings:', err);
@@ -91,6 +98,22 @@ export default function TripSettingsScreen() {
     };
     fetchSettings();
   }, [tripId]);
+
+  const handleAddParticipant = () => {
+    const clean = newParticipantText.trim();
+    if (!clean) return;
+    if (participants.includes(clean)) {
+      const msg = isRTL ? 'משתתף זה כבר קיים' : 'Participant already exists';
+      if (Platform.OS === 'web') alert(msg); else Alert.alert('Notice', msg);
+      return;
+    }
+    setParticipants(prev => [...prev, clean]);
+    setNewParticipantText('');
+  };
+
+  const handleDeleteParticipant = (name: string) => {
+    setParticipants(prev => prev.filter(p => p !== name));
+  };
 
   const handleAddCategory = () => {
     const clean = newCategoryText.trim();
@@ -204,7 +227,7 @@ export default function TripSettingsScreen() {
 
     try {
       setSaving(true);
-      await updateTripSettings(tripId, selectedItem.code, parsedRate, timeFormat, currenciesList, packingCategories);
+      await updateTripSettings(tripId, selectedItem.code, parsedRate, timeFormat, currenciesList, packingCategories, participants);
       
       const successMsg = isRTL 
         ? 'ההגדרות נשמרו בהצלחה!' 
@@ -465,6 +488,62 @@ export default function TripSettingsScreen() {
                 12-Hour (02:30 PM)
               </Text>
             </TouchableOpacity>
+          </View>
+
+          {/* Trip Participants Management */}
+          <Text style={[styles.label, textAlignStyle, { marginTop: 16, color: colors.primary, fontWeight: 'bold' }]}>
+            👥 {isRTL ? 'משתתפי הטיול (עבור רשימת אריזה אישית)' : 'Trip Participants (For Personalized Packing)'}
+          </Text>
+
+          <View style={{ backgroundColor: '#f8f9fa', borderRadius: 12, padding: 14, borderWidth: 1, borderColor: '#dee2e6', marginBottom: 16 }}>
+            <View style={[rowDirectionStyle, { flexWrap: 'wrap', gap: 8, marginBottom: 12 }]}>
+              {participants.length === 0 ? (
+                <Text style={{ fontSize: 12, color: '#868e96', fontStyle: 'italic' }}>
+                  {isRTL ? 'אין משתתפים שנוספו עדיין. הוסף שמות כדי ליצור רשימת אריזה אישית!' : 'No participants added yet. Add names for personalized packing lists!'}
+                </Text>
+              ) : (
+                participants.map((person, idx) => (
+                  <View
+                    key={person + idx}
+                    style={[rowDirectionStyle, {
+                      alignItems: 'center',
+                      backgroundColor: '#e7f5ff',
+                      borderWidth: 1,
+                      borderColor: '#1971c2',
+                      borderRadius: 20,
+                      paddingHorizontal: 12,
+                      paddingVertical: 6,
+                      gap: 6
+                    }]}
+                  >
+                    <Text style={{ fontSize: 13, fontWeight: 'bold', color: '#1971c2' }}>
+                      👤 {person}
+                    </Text>
+                    <TouchableOpacity onPress={() => handleDeleteParticipant(person)} style={{ padding: 2 }}>
+                      <Text style={{ fontSize: 12, color: '#e03131', fontWeight: 'bold' }}>✕</Text>
+                    </TouchableOpacity>
+                  </View>
+                ))
+              )}
+            </View>
+
+            <View style={[rowDirectionStyle, { gap: 8 }]}>
+              <TextInput
+                style={[styles.input, textAlignStyle, { flex: 1, backgroundColor: '#ffffff' }]}
+                placeholder={isRTL ? 'שם משתתף (למשל: מיכאל, דני)...' : 'Participant name (e.g. Michael, Danny)...'}
+                value={newParticipantText}
+                onChangeText={setNewParticipantText}
+              />
+              <TouchableOpacity
+                style={{ backgroundColor: '#1971c2', paddingHorizontal: 14, borderRadius: 8, justifyContent: 'center', alignItems: 'center' }}
+                onPress={handleAddParticipant}
+                activeOpacity={0.8}
+              >
+                <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 13 }}>
+                  + {isRTL ? 'הוסף משתתף' : 'Add Person'}
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
           {/* Packing & Equipment Categories Management */}

@@ -28,6 +28,7 @@ export interface Trip {
   timeFormat?: '24h' | '12h';
   currenciesTable?: CurrencyRowItem[];
   packingCategories?: string[];
+  participants?: string[];
 }
 
 export interface Expense {
