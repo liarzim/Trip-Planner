@@ -71,6 +71,9 @@ export interface Event {
   routePolyline?: string;
   transportMode?: string;
   cost?: number;
+  originalCost?: number;
+  originalCurrency?: string;
+  currency?: string;
   hasKomootTrack?: boolean;
   komootTrackUrl?: string;
   hasQrCode?: boolean;

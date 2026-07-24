@@ -697,8 +697,9 @@ export default function TripDashboardScreen() {
     setEventCheckOutTime(item.checkOutTime || '');
     setEventQrCodeUrl(item.qrCodeUrl || '');
     setEventTransportMode((item.transportMode as 'driving' | 'transit') || '');
-    setEventCost(item.cost !== undefined ? item.cost.toString() : '');
-    setEventCurrency(tripBaseCurrency || 'USD');
+    const origCost = item.originalCost !== undefined ? item.originalCost : item.cost;
+    setEventCost(origCost !== undefined ? origCost.toString() : '');
+    setEventCurrency(item.originalCurrency || item.currency || tripBaseCurrency || 'USD');
     setHasKomootTrack(!!item.hasKomootTrack && !!item.komootTrackUrl);
     setKomootTrackUrl(item.komootTrackUrl || '');
     setHasQrCode(!!item.hasQrCode || !!item.qrCodeUrl);
@@ -775,13 +776,15 @@ export default function TripDashboardScreen() {
       return;
     }
 
-    let costVal = eventCost ? parseFloat(eventCost) : undefined;
-    if (eventCost && isNaN(costVal!)) {
+    const rawCost = eventCost ? parseFloat(eventCost) : undefined;
+    if (eventCost && isNaN(rawCost!)) {
       setEventFormError(isRTL ? 'העלות חייבת להיות מספר תקין' : 'Cost must be a valid number');
       return;
     }
-    if (typeof costVal === 'number' && eventCurrency && tripBaseCurrency) {
-      costVal = convertAmount(costVal, eventCurrency, tripBaseCurrency, tripCurrenciesTable);
+    const selectedCurr = eventCurrency || tripBaseCurrency || 'USD';
+    let costVal = rawCost;
+    if (typeof costVal === 'number' && selectedCurr && tripBaseCurrency) {
+      costVal = convertAmount(costVal, selectedCurr, tripBaseCurrency, tripCurrenciesTable);
     }
 
     // Step 4: Flight Specific Input Validations
@@ -957,6 +960,9 @@ export default function TripDashboardScreen() {
           qrCodeUrl: hasQrCode ? eventQrCodeUrl.trim() || undefined : undefined,
           transportMode: eventTransportMode || undefined,
           cost: costVal,
+          originalCost: rawCost,
+          originalCurrency: selectedCurr,
+          currency: tripBaseCurrency,
           originLatitude: finalOriginLat,
           originLongitude: finalOriginLon,
           address: eventAddress.trim() || undefined,
@@ -998,7 +1004,10 @@ export default function TripDashboardScreen() {
           finalRoutePolyline,
           hasKomootTrack,
           hasKomootTrack ? komootTrackUrl.trim() : undefined,
-          hasQrCode
+          hasQrCode,
+          rawCost,
+          selectedCurr,
+          tripBaseCurrency
         );
       }
 

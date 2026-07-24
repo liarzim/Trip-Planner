@@ -172,7 +172,10 @@ export const createEvent = async (
   routePolyline?: string,
   hasKomootTrack?: boolean,
   komootTrackUrl?: string,
-  hasQrCode?: boolean
+  hasQrCode?: boolean,
+  originalCost?: number,
+  originalCurrency?: string,
+  currency?: string
 ): Promise<Event> => {
   const eventsCollection = collection(db, 'events');
   const data: any = {
@@ -209,6 +212,9 @@ export const createEvent = async (
   if (hasKomootTrack !== undefined) data.hasKomootTrack = hasKomootTrack;
   if (komootTrackUrl !== undefined) data.komootTrackUrl = komootTrackUrl;
   if (hasQrCode !== undefined) data.hasQrCode = hasQrCode;
+  if (originalCost !== undefined) data.originalCost = originalCost;
+  if (originalCurrency !== undefined) data.originalCurrency = originalCurrency;
+  if (currency !== undefined) data.currency = currency;
 
   const docRef = await addDoc(eventsCollection, data);
 
@@ -246,6 +252,9 @@ export const createEvent = async (
     hasKomootTrack,
     komootTrackUrl,
     hasQrCode,
+    originalCost,
+    originalCurrency,
+    currency,
   };
 };
 
@@ -302,6 +311,9 @@ export const getEventsForTrip = async (tripId: string): Promise<Event[]> => {
       routePolyline: data.routePolyline,
       transportMode: data.transportMode,
       cost: data.cost,
+      originalCost: data.originalCost,
+      originalCurrency: data.originalCurrency,
+      currency: data.currency,
       hasKomootTrack: data.hasKomootTrack,
       komootTrackUrl: data.komootTrackUrl,
       hasQrCode: data.hasQrCode,
