@@ -22,7 +22,7 @@ import QRCode from 'react-native-qrcode-svg';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system/legacy';
 import { RootStackParamList } from '../navigation/AppNavigator';
-import { getEventsForTrip, getExpensesForTrip, getDocumentsForTrip, saveDocument, getTrip, createEvent, updateEvent, deleteEvent, updateTripSettings } from '../services/dbService';
+import { getEventsForTrip, getExpensesForTrip, getDocumentsForTrip, saveDocument, getTrip, createEvent, updateEvent, deleteEvent, updateTripSettings, createExpense } from '../services/dbService';
 import { uploadTripDocument } from '../services/storageService';
 import { geocodeAddress } from '../services/geocodingService';
 import { fetchRouteDirections } from '../services/directionsService';
@@ -154,10 +154,55 @@ export default function TripDashboardScreen() {
   const [isPhotoPopupVisible, setIsPhotoPopupVisible] = useState(false);
   const [popupImageUri, setPopupImageUri] = useState('');
 
-  // Hamburger Menu & Modals States
   const [isHamburgerMenuOpen, setIsHamburgerMenuOpen] = useState(false);
   const [isPackingModalVisible, setIsPackingModalVisible] = useState(false);
   const [isExpensePageModalVisible, setIsExpensePageModalVisible] = useState(false);
+
+  // Add Expense Popup Modal State
+  const [isAddExpenseModalVisible, setIsAddExpenseModalVisible] = useState(false);
+  const [expenseAmount, setExpenseAmount] = useState('');
+  const [expenseCurrency, setExpenseCurrency] = useState('USD');
+  const [expenseCategory, setExpenseCategory] = useState('Food');
+  const [expenseDescription, setExpenseDescription] = useState('');
+  const [expenseSaving, setExpenseSaving] = useState(false);
+  const [expenseFormError, setExpenseFormError] = useState('');
+
+  const handleOpenAddExpenseModal = () => {
+    setExpenseAmount('');
+    setExpenseCurrency(tripBaseCurrency || 'USD');
+    setExpenseCategory('Food');
+    setExpenseDescription('');
+    setExpenseFormError('');
+    setIsAddExpenseModalVisible(true);
+  };
+
+  const handleSaveExpenseItem = async () => {
+    if (!expenseAmount.trim() || !expenseCurrency.trim() || !expenseCategory.trim() || !expenseDescription.trim()) {
+      setExpenseFormError(isRTL ? 'יש למלא את כל שדות החובה' : 'Please fill in all required fields');
+      return;
+    }
+
+    const parsedAmount = parseFloat(expenseAmount);
+    if (isNaN(parsedAmount) || parsedAmount <= 0) {
+      setExpenseFormError(isRTL ? 'אנא הזן סכום חיובי תקין' : 'Please enter a valid positive amount');
+      return;
+    }
+
+    setExpenseFormError('');
+    setExpenseSaving(true);
+
+    try {
+      await createExpense(tripId, parsedAmount, expenseCurrency.trim().toUpperCase(), expenseCategory.trim(), expenseDescription.trim());
+      const updatedExpenses = await getExpensesForTrip(tripId);
+      setExpenses(updatedExpenses);
+      setIsAddExpenseModalVisible(false);
+    } catch (err: any) {
+      setExpenseFormError(err.message || (isRTL ? 'שגיאה בשמירת ההוצאה' : 'Failed to save expense'));
+    } finally {
+      setExpenseSaving(false);
+    }
+  };
+
   const [packingItems, setPackingItems] = useState([
     { id: '1', title: 'דרכון / תעודת זהות (Passport/ID)', checked: true },
     { id: '2', title: 'כרטיסי טיסה ושוברים (Tickets & Vouchers)', checked: true },
@@ -2486,7 +2531,7 @@ export default function TripDashboardScreen() {
               style={{ flex: 1, backgroundColor: colors.primary, paddingVertical: 10, borderRadius: 8, alignItems: 'center' }}
               onPress={() => {
                 setIsExpensePageModalVisible(false);
-                navigation.navigate('AddExpense', { tripId });
+                handleOpenAddExpenseModal();
               }}
             >
               <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 13 }}>+ {isRTL ? 'הוסף הוצאה חדשה' : 'Add New Expense'}</Text>
@@ -2502,6 +2547,179 @@ export default function TripDashboardScreen() {
       </View>
     </Modal>
   );
+
+  const renderAddExpenseModal = () => {
+    const categories = [
+      { id: 'Food', label: isRTL ? '🍔 אוכל' : '🍔 Food' },
+      { id: 'Transport', label: isRTL ? '🚗 תחבורה' : '🚗 Transport' },
+      { id: 'Accommodation', label: isRTL ? '🏨 לינה' : '🏨 Accommodation' },
+      { id: 'Other', label: isRTL ? '🛒 אחר' : '🛒 Other' },
+    ];
+
+    return (
+      <Modal
+        visible={isAddExpenseModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setIsAddExpenseModalVisible(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+          <View style={{ width: '90%', maxWidth: 520, backgroundColor: '#ffffff', borderRadius: 16, padding: 22, elevation: 5 }}>
+            <View style={[rowDirectionStyle, { justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#f1f3f5', paddingBottom: 10, marginBottom: 14 }]}>
+              <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.primary }}>
+                💰 {isRTL ? 'הוספת הוצאה חדשה' : 'Add New Expense'}
+              </Text>
+              <TouchableOpacity onPress={() => setIsAddExpenseModalVisible(false)} style={{ padding: 4 }}>
+                <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#868e96' }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            {expenseFormError ? (
+              <View style={{ backgroundColor: '#fff5f5', borderWidth: 1, borderColor: '#ffc9c9', borderRadius: 8, padding: 10, marginBottom: 12 }}>
+                <Text style={{ color: '#e03131', fontSize: 12, fontWeight: 'bold', textAlign: isRTL ? 'right' : 'left' }}>
+                  ⚠️ {expenseFormError}
+                </Text>
+              </View>
+            ) : null}
+
+            <ScrollView style={{ maxHeight: 420 }}>
+              {/* Amount & Currency Row */}
+              <View style={[rowDirectionStyle, { gap: 10, marginBottom: 14 }]}>
+                <View style={{ flex: 1.5 }}>
+                  <Text style={[styles.modalFormLabel, textAlignStyle]}>
+                    💰 {isRTL ? 'סכום *' : 'Amount *'}
+                  </Text>
+                  <TextInput
+                    style={[styles.modalFormInput, textAlignStyle]}
+                    placeholder="0.00"
+                    value={expenseAmount}
+                    onChangeText={setExpenseAmount}
+                    keyboardType="decimal-pad"
+                  />
+                </View>
+
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.modalFormLabel, textAlignStyle]}>
+                    💱 {isRTL ? 'מטבע' : 'Currency'}
+                  </Text>
+                  {Platform.OS === 'web' ? (
+                    <select
+                      value={expenseCurrency}
+                      onChange={(e) => setExpenseCurrency(e.target.value)}
+                      style={{
+                        backgroundColor: '#f8f9fa',
+                        border: '1px solid #dee2e6',
+                        borderRadius: '8px',
+                        padding: '10px 8px',
+                        fontSize: '14px',
+                        fontFamily: 'inherit',
+                        width: '100%',
+                        boxSizing: 'border-box',
+                        height: '42px',
+                        color: '#212529',
+                        fontWeight: 'bold',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {(tripCurrenciesTable && tripCurrenciesTable.length > 0
+                        ? tripCurrenciesTable
+                        : SUPPORTED_CURRENCIES
+                      ).map((c) => (
+                        <option key={c.code} value={c.code}>
+                          {c.code} ({c.symbol})
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <TextInput
+                      style={[styles.modalFormInput, textAlignStyle, { height: 42 }]}
+                      placeholder="USD"
+                      value={expenseCurrency}
+                      onChangeText={setExpenseCurrency}
+                      autoCapitalize="characters"
+                      maxLength={3}
+                    />
+                  )}
+                </View>
+              </View>
+
+              {/* Category selector */}
+              <View style={{ marginBottom: 14 }}>
+                <Text style={[styles.modalFormLabel, textAlignStyle]}>
+                  🏷️ {isRTL ? 'קטגוריה' : 'Category'}
+                </Text>
+                <View style={[rowDirectionStyle, { flexWrap: 'wrap', gap: 8, marginTop: 4 }]}>
+                  {categories.map((cat) => (
+                    <TouchableOpacity
+                      key={cat.id}
+                      style={{
+                        paddingVertical: 8,
+                        paddingHorizontal: 12,
+                        borderRadius: 8,
+                        borderWidth: 1,
+                        borderColor: expenseCategory === cat.id ? colors.primary : '#dee2e6',
+                        backgroundColor: expenseCategory === cat.id ? '#e7f5ff' : '#f8f9fa',
+                      }}
+                      onPress={() => setExpenseCategory(cat.id)}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={{
+                        fontSize: 12,
+                        fontWeight: 'bold',
+                        color: expenseCategory === cat.id ? colors.primary : '#495057'
+                      }}>
+                        {cat.label}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              {/* Description */}
+              <View style={{ marginBottom: 16 }}>
+                <Text style={[styles.modalFormLabel, textAlignStyle]}>
+                  📝 {isRTL ? 'תיאור ההוצאה *' : 'Description *'}
+                </Text>
+                <TextInput
+                  style={[styles.modalFormInput, textAlignStyle]}
+                  placeholder={isRTL ? 'למשל: ארוחת ערב במסעדה, מונית...' : 'e.g. Dinner, Taxi to hotel...'}
+                  value={expenseDescription}
+                  onChangeText={setExpenseDescription}
+                />
+              </View>
+
+              {/* Save & Cancel Buttons */}
+              <TouchableOpacity
+                style={styles.modalSaveBtn}
+                onPress={handleSaveExpenseItem}
+                disabled={expenseSaving}
+                activeOpacity={0.8}
+              >
+                {expenseSaving ? (
+                  <ActivityIndicator color="#ffffff" />
+                ) : (
+                  <Text style={styles.modalSaveBtnText}>
+                    {isRTL ? 'שמור הוצאה' : 'Save Expense'}
+                  </Text>
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.modalCancelBtn}
+                onPress={() => setIsAddExpenseModalVisible(false)}
+                disabled={expenseSaving}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.modalCancelBtnText}>
+                  {isRTL ? 'ביטול' : 'Cancel'}
+                </Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+    );
+  };
 
   const renderWebSubHeaderBanner = () => (
     <View style={[rowDirectionStyle, {
@@ -2840,7 +3058,7 @@ export default function TripDashboardScreen() {
             style={[rowDirectionStyle, { paddingVertical: 12, paddingHorizontal: 16, alignItems: 'center' }]}
             onPress={() => {
               setIsHamburgerMenuOpen(false);
-              navigation.navigate('AddExpense', { tripId });
+              handleOpenAddExpenseModal();
             }}
             activeOpacity={0.7}
           >
@@ -2946,7 +3164,7 @@ export default function TripDashboardScreen() {
                 </TouchableOpacity>
                 <TouchableOpacity 
                   style={[styles.webActionBtn, { backgroundColor: '#d9480f' }]}
-                  onPress={() => navigation.navigate('AddExpense', { tripId })}
+                  onPress={handleOpenAddExpenseModal}
                   activeOpacity={0.8}
                 >
                   <Text style={styles.buttonText}>+ {isRTL ? 'הוסף הוצאה' : 'Add Expense'}</Text>
@@ -2971,7 +3189,7 @@ export default function TripDashboardScreen() {
             </TouchableOpacity>
             <TouchableOpacity 
               style={[styles.button, styles.expenseButton]}
-              onPress={() => navigation.navigate('AddExpense', { tripId })}
+              onPress={handleOpenAddExpenseModal}
               activeOpacity={0.8}
             >
               <Text style={styles.buttonText}>{t('dashboard.add_expense')}</Text>
@@ -2996,6 +3214,9 @@ export default function TripDashboardScreen() {
 
       {/* Expense Page Modal */}
       {renderExpensePageModal()}
+
+      {/* Add Expense Popup Modal */}
+      {renderAddExpenseModal()}
 
       {/* Ticket QR Code Modal */}
       <Modal
