@@ -1260,7 +1260,10 @@ export default function TripDashboardScreen() {
 
   const expensesTotal = expenses.reduce((sum, item) => {
     const amt = Number(item.amount);
-    return sum + (isNaN(amt) || !isFinite(amt) ? 0 : amt);
+    if (isNaN(amt) || !isFinite(amt)) return sum;
+    const itemCurr = item.currency || tripBaseCurrency || 'USD';
+    const convertedAmt = convertAmount(amt, itemCurr, tripBaseCurrency, tripCurrenciesTable);
+    return sum + convertedAmt;
   }, 0);
 
   const eventsTotal = events.reduce((sum, item) => {
@@ -2512,17 +2515,30 @@ export default function TripDashboardScreen() {
                 {isRTL ? 'אין הוצאות מתועדות עדיין' : 'No expenses recorded yet.'}
               </Text>
             ) : (
-              expenses.map(exp => (
-                <View key={exp.id} style={[rowDirectionStyle, { justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#f1f3f5' }]}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 14, fontWeight: 'bold', color: '#212529' }}>{exp.description || exp.category}</Text>
-                    <Text style={{ fontSize: 11, color: '#868e96' }}>{exp.date} • {exp.category}</Text>
+              expenses.map(exp => {
+                const expCurr = exp.currency || tripBaseCurrency || 'USD';
+                const isDifferent = expCurr.toUpperCase() !== (tripBaseCurrency || 'USD').toUpperCase();
+                const converted = convertAmount(exp.amount, expCurr, tripBaseCurrency, tripCurrenciesTable);
+                const baseSymbol = getCurrencySymbol(tripBaseCurrency, tripCurrenciesTable);
+                return (
+                  <View key={exp.id} style={[rowDirectionStyle, { justifyContent: 'space-between', alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#f1f3f5' }]}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontSize: 14, fontWeight: 'bold', color: '#212529' }}>{exp.description || exp.category}</Text>
+                      <Text style={{ fontSize: 11, color: '#868e96' }}>{exp.date} • {exp.category}</Text>
+                    </View>
+                    <View style={{ alignItems: isRTL ? 'flex-start' : 'flex-end' }}>
+                      <Text style={{ fontSize: 14, fontWeight: 'bold', color: '#2b8a3e' }}>
+                        {exp.amount.toFixed(2)} {expCurr}
+                      </Text>
+                      {isDifferent && (
+                        <Text style={{ fontSize: 11, color: '#0b7285', fontWeight: '500', marginTop: 1 }}>
+                          ≈ {baseSymbol}{converted.toFixed(2)} {tripBaseCurrency}
+                        </Text>
+                      )}
+                    </View>
                   </View>
-                  <Text style={{ fontSize: 14, fontWeight: 'bold', color: '#2b8a3e' }}>
-                    {exp.amount} {exp.currency || tripBaseCurrency}
-                  </Text>
-                </View>
-              ))
+                );
+              })
             )}
           </ScrollView>
 
@@ -2642,6 +2658,38 @@ export default function TripDashboardScreen() {
                   )}
                 </View>
               </View>
+
+              {/* Live Automated Currency Exchange Display */}
+              {(() => {
+                const numCost = parseFloat(expenseAmount);
+                if (!isNaN(numCost) && numCost > 0 && expenseCurrency && tripBaseCurrency) {
+                  const convertedVal = convertAmount(numCost, expenseCurrency, tripBaseCurrency, tripCurrenciesTable);
+                  const baseSymbol = getCurrencySymbol(tripBaseCurrency, tripCurrenciesTable);
+                  const isDifferentCurrency = expenseCurrency.toUpperCase() !== tripBaseCurrency.toUpperCase();
+                  
+                  return (
+                    <View style={{
+                      marginBottom: 14,
+                      padding: 10,
+                      backgroundColor: isDifferentCurrency ? '#e7f5ff' : '#f8f9fa',
+                      borderRadius: 8,
+                      borderWidth: 1,
+                      borderColor: isDifferentCurrency ? '#a5d8ff' : '#dee2e6',
+                      flexDirection: isRTL ? 'row-reverse' : 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between'
+                    }}>
+                      <Text style={{ fontSize: 13, color: isDifferentCurrency ? '#1971c2' : '#495057', fontWeight: 'bold' }}>
+                        💱 {isRTL ? 'המרה אוטומטית למטבע הראשי של הטיול:' : 'Auto-Converted to Trip Base Currency:'}
+                      </Text>
+                      <Text style={{ fontSize: 14, color: isDifferentCurrency ? '#0b7285' : '#212529', fontWeight: 'bold' }}>
+                        ≈ {convertedVal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {baseSymbol} ({tripBaseCurrency})
+                      </Text>
+                    </View>
+                  );
+                }
+                return null;
+              })()}
 
               {/* Category selector */}
               <View style={{ marginBottom: 14 }}>
