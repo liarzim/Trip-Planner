@@ -14,7 +14,7 @@ import {
 import { useRoute, useNavigation, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../navigation/AppNavigator';
-import { getTrip, updateTripSettings } from '../services/dbService';
+import { getTrip, updateTripSettings, DEFAULT_PACKING_CATEGORIES } from '../services/dbService';
 import { useTranslation } from '../services/translationService';
 import { colors } from '../theme/colors';
 import { typography } from '../theme/typography';
@@ -35,6 +35,10 @@ export default function TripSettingsScreen() {
   const [saving, setSaving] = useState(false);
   const [tripName, setTripName] = useState('');
   const [timeFormat, setTimeFormat] = useState<'24h' | '12h'>('24h');
+
+  // Packing categories state
+  const [packingCategories, setPackingCategories] = useState<string[]>(DEFAULT_PACKING_CATEGORIES);
+  const [newCategoryText, setNewCategoryText] = useState('');
 
   // Currency Table state
   const [currenciesList, setCurrenciesList] = useState<CurrencyRowItem[]>(SUPPORTED_CURRENCIES);
@@ -73,6 +77,11 @@ export default function TripSettingsScreen() {
           if (trip.timeFormat) {
             setTimeFormat(trip.timeFormat);
           }
+          if (trip.packingCategories && Array.isArray(trip.packingCategories) && trip.packingCategories.length > 0) {
+            setPackingCategories(trip.packingCategories);
+          } else {
+            setPackingCategories(DEFAULT_PACKING_CATEGORIES);
+          }
         }
       } catch (err) {
         console.error('Failed to load trip settings:', err);
@@ -82,6 +91,27 @@ export default function TripSettingsScreen() {
     };
     fetchSettings();
   }, [tripId]);
+
+  const handleAddCategory = () => {
+    const clean = newCategoryText.trim();
+    if (!clean) return;
+    if (packingCategories.includes(clean)) {
+      const msg = isRTL ? 'קטגוריה זו כבר קיימת' : 'Category already exists';
+      if (Platform.OS === 'web') alert(msg); else Alert.alert('Notice', msg);
+      return;
+    }
+    setPackingCategories(prev => [...prev, clean]);
+    setNewCategoryText('');
+  };
+
+  const handleDeleteCategory = (catName: string) => {
+    if (packingCategories.length <= 1) {
+      const msg = isRTL ? 'חייבת להישאר לפחות קטגוריה אחת' : 'Must keep at least one category';
+      if (Platform.OS === 'web') alert(msg); else Alert.alert('Notice', msg);
+      return;
+    }
+    setPackingCategories(prev => prev.filter(c => c !== catName));
+  };
 
   const handleSelectCurrency = (item: CurrencyRowItem) => {
     setSelectedCurrencyCode(item.code);
@@ -174,7 +204,7 @@ export default function TripSettingsScreen() {
 
     try {
       setSaving(true);
-      await updateTripSettings(tripId, selectedItem.code, parsedRate, timeFormat, currenciesList);
+      await updateTripSettings(tripId, selectedItem.code, parsedRate, timeFormat, currenciesList, packingCategories);
       
       const successMsg = isRTL 
         ? 'ההגדרות נשמרו בהצלחה!' 
@@ -435,6 +465,56 @@ export default function TripSettingsScreen() {
                 12-Hour (02:30 PM)
               </Text>
             </TouchableOpacity>
+          </View>
+
+          {/* Packing & Equipment Categories Management */}
+          <Text style={[styles.label, textAlignStyle, { marginTop: 16, color: colors.primary, fontWeight: 'bold' }]}>
+            🎒 {isRTL ? 'קטגוריות רשימת אריזה וציוד' : 'Packing & Equipment Categories'}
+          </Text>
+
+          <View style={{ backgroundColor: '#f8f9fa', borderRadius: 12, padding: 14, borderWidth: 1, borderColor: '#dee2e6', marginBottom: 16 }}>
+            <View style={[rowDirectionStyle, { flexWrap: 'wrap', gap: 8, marginBottom: 12 }]}>
+              {packingCategories.map((cat, idx) => (
+                <View
+                  key={cat + idx}
+                  style={[rowDirectionStyle, {
+                    alignItems: 'center',
+                    backgroundColor: '#ffffff',
+                    borderWidth: 1,
+                    borderColor: colors.primary,
+                    borderRadius: 20,
+                    paddingHorizontal: 12,
+                    paddingVertical: 6,
+                    gap: 6
+                  }]}
+                >
+                  <Text style={{ fontSize: 13, fontWeight: 'bold', color: colors.primary }}>
+                    {cat}
+                  </Text>
+                  <TouchableOpacity onPress={() => handleDeleteCategory(cat)} style={{ padding: 2 }}>
+                    <Text style={{ fontSize: 12, color: '#e03131', fontWeight: 'bold' }}>✕</Text>
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+
+            <View style={[rowDirectionStyle, { gap: 8 }]}>
+              <TextInput
+                style={[styles.input, textAlignStyle, { flex: 1, backgroundColor: '#ffffff' }]}
+                placeholder={isRTL ? 'שם קטגוריה חדשה (למשל: ⛺ ציוד קמפינג)...' : 'New category name...'}
+                value={newCategoryText}
+                onChangeText={setNewCategoryText}
+              />
+              <TouchableOpacity
+                style={{ backgroundColor: colors.primary, paddingHorizontal: 14, borderRadius: 8, justifyContent: 'center', alignItems: 'center' }}
+                onPress={handleAddCategory}
+                activeOpacity={0.8}
+              >
+                <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 13 }}>
+                  + {isRTL ? 'הוסף' : 'Add'}
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
 
           {/* Static Preview Info Card */}

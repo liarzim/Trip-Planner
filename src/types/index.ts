@@ -27,6 +27,7 @@ export interface Trip {
   exchangeRateToILS?: number;
   timeFormat?: '24h' | '12h';
   currenciesTable?: CurrencyRowItem[];
+  packingCategories?: string[];
 }
 
 export interface Expense {

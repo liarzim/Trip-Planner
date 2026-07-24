@@ -437,6 +437,15 @@ export const getDocumentsForTrip = async (tripId: string): Promise<Document[]> =
   });
 };
 
+export const DEFAULT_PACKING_CATEGORIES = [
+  '✈️ בגדים לטיסה',
+  '👥 בגדים לפי משתתף',
+  '🎒 תיק גב / תיק יד',
+  '🥪 אוכל לטיסה',
+  '💊 תרופות ועזרה ראשונה',
+  '📦 ציוד כללי'
+];
+
 /**
  * Creates a new PackingItem document in Firestore under 'packingItems'.
  */
@@ -449,7 +458,7 @@ export const createPackingItem = async (
   const data = {
     tripId,
     itemName,
-    category,
+    category: category || DEFAULT_PACKING_CATEGORIES[5],
     isPacked: false,
   };
   const docRef = await addDoc(packingItemsCollection, data);
@@ -467,13 +476,47 @@ export const getPackingItemsForTrip = async (tripId: string): Promise<PackingIte
   const q = query(packingItemsCollection, where('tripId', '==', tripId));
   const querySnapshot = await getDocs(q);
 
+  if (querySnapshot.docs.length === 0) {
+    const defaultItems = [
+      { itemName: "ז'קט / עליונית לטיסה", category: "✈️ בגדים לטיסה" },
+      { itemName: "נעליים נוחות לטיסה", category: "✈️ בגדים לטיסה" },
+      { itemName: "בגדים ונעליים להחלפה", category: "👥 בגדים לפי משתתף" },
+      { itemName: "לבנים וגרביים", category: "👥 בגדים לפי משתתף" },
+      { itemName: "דרכון / תעודת זהות", category: "🎒 תיק גב / תיק יד" },
+      { itemName: "מטען לטלפון וסוללה ניידת", category: "🎒 תיק גב / תיק יד" },
+      { itemName: "אוזניות ומשקפי שמש", category: "🎒 תיק גב / תיק יד" },
+      { itemName: "חטיפים וכריכים לטיסה", category: "🥪 אוכל לטיסה" },
+      { itemName: "בקבוק מים", category: "🥪 אוכל לטיסה" },
+      { itemName: "ערכת עזרה ראשונה ותרופות", category: "💊 תרופות ועזרה ראשונה" },
+      { itemName: "כלי רחצה וקרם הגנה", category: "📦 ציוד כללי" },
+      { itemName: "ביטוח נסיעות וכרטיסים", category: "📦 ציוד כללי" },
+    ];
+    const created: PackingItem[] = [];
+    for (const item of defaultItems) {
+      const docRef = await addDoc(packingItemsCollection, {
+        tripId,
+        itemName: item.itemName,
+        category: item.category,
+        isPacked: false,
+      });
+      created.push({
+        id: docRef.id,
+        tripId,
+        itemName: item.itemName,
+        category: item.category,
+        isPacked: false,
+      });
+    }
+    return created;
+  }
+
   return querySnapshot.docs.map((doc) => {
     const data = doc.data();
     return {
       id: doc.id,
       tripId: data.tripId,
       itemName: data.itemName,
-      category: data.category,
+      category: data.category || DEFAULT_PACKING_CATEGORIES[5],
       isPacked: !!data.isPacked,
     } as PackingItem;
   });
@@ -530,18 +573,20 @@ export const getTrip = async (tripId: string): Promise<Trip | null> => {
     exchangeRateToILS: data.exchangeRateToILS,
     timeFormat: data.timeFormat || '24h',
     currenciesTable: data.currenciesTable || undefined,
+    packingCategories: data.packingCategories && Array.isArray(data.packingCategories) && data.packingCategories.length > 0 ? data.packingCategories : DEFAULT_PACKING_CATEGORIES,
   } as Trip;
 };
 
 /**
- * Updates the currency settings, time format, and custom currency table for a specific trip in Firestore.
+ * Updates the currency settings, time format, custom currency table, and packing categories for a specific trip in Firestore.
  */
 export const updateTripSettings = async (
   tripId: string,
   baseCurrency: string,
   exchangeRateToILS: number,
   timeFormat?: '24h' | '12h',
-  currenciesTable?: any[]
+  currenciesTable?: any[],
+  packingCategories?: string[]
 ): Promise<void> => {
   const tripDocRef = doc(db, 'trips', tripId);
   const data: any = {
@@ -550,6 +595,7 @@ export const updateTripSettings = async (
   };
   if (timeFormat) data.timeFormat = timeFormat;
   if (currenciesTable) data.currenciesTable = currenciesTable;
+  if (packingCategories) data.packingCategories = packingCategories;
   await updateDoc(tripDocRef, data);
 };
 

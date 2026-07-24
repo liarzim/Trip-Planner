@@ -22,12 +22,12 @@ import QRCode from 'react-native-qrcode-svg';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system/legacy';
 import { RootStackParamList } from '../navigation/AppNavigator';
-import { getEventsForTrip, getExpensesForTrip, getDocumentsForTrip, saveDocument, getTrip, createEvent, updateEvent, deleteEvent, updateTripSettings, createExpense } from '../services/dbService';
+import { getEventsForTrip, getExpensesForTrip, getDocumentsForTrip, saveDocument, getTrip, createEvent, updateEvent, deleteEvent, updateTripSettings, createExpense, getPackingItemsForTrip, createPackingItem, updatePackingItemPacked, deletePackingItem, DEFAULT_PACKING_CATEGORIES } from '../services/dbService';
 import { uploadTripDocument } from '../services/storageService';
 import { geocodeAddress } from '../services/geocodingService';
 import { fetchRouteDirections } from '../services/directionsService';
 import { getCachedOrDownloadFile, isFileCached } from '../services/fileCacheService';
-import { Event, Expense, Document, Trip } from '../types';
+import { Event, Expense, Document, Trip, PackingItem } from '../types';
 import { useNetworkState } from '../hooks/useNetworkState';
 import { colors } from '../theme/colors';
 import { typography } from '../theme/typography';
@@ -203,15 +203,13 @@ export default function TripDashboardScreen() {
     }
   };
 
-  const [packingItems, setPackingItems] = useState([
-    { id: '1', title: 'דרכון / תעודת זהות (Passport/ID)', checked: true },
-    { id: '2', title: 'כרטיסי טיסה ושוברים (Tickets & Vouchers)', checked: true },
-    { id: '3', title: 'מטען לטלפון ומתאם שקע (Phone Charger & Adapter)', checked: false },
-    { id: '4', title: 'ערכת עזרה ראשונה ותרופות (First Aid & Meds)', checked: false },
-    { id: '5', title: 'ביטוח נסיעות (Travel Insurance)', checked: true },
-    { id: '6', title: 'בגדים ונעליים מתאימים (Clothing & Shoes)', checked: false },
-    { id: '7', title: 'כלי רחצה וקרם הגנה (Toiletries & Sunscreen)', checked: false },
-  ]);
+  // Packing List & Categories States
+  const [dbPackingItems, setDbPackingItems] = useState<PackingItem[]>([]);
+  const [tripPackingCategories, setTripPackingCategories] = useState<string[]>(DEFAULT_PACKING_CATEGORIES);
+  const [selectedAddCategory, setSelectedAddCategory] = useState<string>('');
+  const [collapsedPackingCategories, setCollapsedPackingCategories] = useState<Record<string, boolean>>({});
+  const [isAddingCategoryInline, setIsAddingCategoryInline] = useState(false);
+  const [newQuickCategoryText, setNewQuickCategoryText] = useState('');
   const [newPackingItemText, setNewPackingItemText] = useState('');
 
   // Flight Origin & Destination Geocoding States
@@ -406,11 +404,12 @@ export default function TripDashboardScreen() {
       const fetchDashboardData = async () => {
         try {
           setLoading(true);
-          const [fetchedEvents, fetchedExpenses, fetchedDocs, fetchedTrip] = await Promise.all([
+          const [fetchedEvents, fetchedExpenses, fetchedDocs, fetchedTrip, fetchedPacking] = await Promise.all([
             getEventsForTrip(tripId),
             getExpensesForTrip(tripId),
             getDocumentsForTrip(tripId),
-            getTrip(tripId)
+            getTrip(tripId),
+            getPackingItemsForTrip(tripId)
           ]);
           
           if (active) {
@@ -450,6 +449,7 @@ export default function TripDashboardScreen() {
             setEvents(repairedEvents);
             setExpenses(fetchedExpenses);
             setDocuments(fetchedDocs);
+            setDbPackingItems(fetchedPacking);
             if (fetchedTrip) {
               setTripName(fetchedTrip.name || '');
               setTripStartDate(fetchedTrip.startDate || '');
@@ -459,6 +459,11 @@ export default function TripDashboardScreen() {
               }
               if (fetchedTrip.baseCurrency) {
                 setTripBaseCurrency(fetchedTrip.baseCurrency);
+              }
+              if (fetchedTrip.packingCategories && Array.isArray(fetchedTrip.packingCategories) && fetchedTrip.packingCategories.length > 0) {
+                setTripPackingCategories(fetchedTrip.packingCategories);
+              } else {
+                setTripPackingCategories(DEFAULT_PACKING_CATEGORIES);
               }
               if (fetchedTrip.exchangeRateToILS !== undefined) {
                 setTripExchangeRate(fetchedTrip.exchangeRateToILS);
@@ -2411,75 +2416,301 @@ export default function TripDashboardScreen() {
     );
   };
 
-  const renderPackingListModal = () => (
-    <Modal
-      visible={isPackingModalVisible}
-      transparent={true}
-      animationType="slide"
-      onRequestClose={() => setIsPackingModalVisible(false)}
-    >
-      <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
-        <View style={{ width: '90%', maxWidth: 520, backgroundColor: '#ffffff', borderRadius: 16, padding: 20, maxHeight: '80%', elevation: 5 }}>
-          <View style={[rowDirectionStyle, { justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#f1f3f5', paddingBottom: 10, marginBottom: 12 }]}>
-            <Text style={{ fontSize: 18, fontWeight: 'bold', color: colors.primary }}>
-              🎒 {isRTL ? 'רשימת אריזה וציוד' : 'Packing List'}
-            </Text>
-            <TouchableOpacity onPress={() => setIsPackingModalVisible(false)} style={{ padding: 4 }}>
-              <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#868e96' }}>✕</Text>
-            </TouchableOpacity>
-          </View>
+  const renderPackingListModal = () => {
+    const categoriesToUse = tripPackingCategories && tripPackingCategories.length > 0
+      ? tripPackingCategories
+      : DEFAULT_PACKING_CATEGORIES;
 
-          {/* Add new packing item input */}
-          <View style={[rowDirectionStyle, { gap: 8, marginBottom: 12 }]}>
-            <TextInput
-              style={{ flex: 1, borderWidth: 1, borderColor: '#ced4da', borderRadius: 8, paddingHorizontal: 12, paddingVertical: 8, fontSize: 13, backgroundColor: '#fff' }}
-              placeholder={isRTL ? 'הוסף פריט לציוד...' : 'Add item to packing list...'}
-              value={newPackingItemText}
-              onChangeText={setNewPackingItemText}
-            />
-            <TouchableOpacity
-              style={{ backgroundColor: colors.primary, paddingHorizontal: 14, paddingVertical: 8, borderRadius: 8, justifyContent: 'center' }}
-              onPress={() => {
-                if (newPackingItemText.trim()) {
-                  setPackingItems(prev => [...prev, { id: Date.now().toString(), title: newPackingItemText.trim(), checked: false }]);
-                  setNewPackingItemText('');
-                }
-              }}
-            >
-              <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 13 }}>+ {isRTL ? 'הוסף' : 'Add'}</Text>
-            </TouchableOpacity>
-          </View>
+    // Group items by category
+    const itemsByCategory: Record<string, PackingItem[]> = {};
+    categoriesToUse.forEach(cat => {
+      itemsByCategory[cat] = [];
+    });
+    // Add items whose category might be custom
+    dbPackingItems.forEach(item => {
+      const cat = item.category || DEFAULT_PACKING_CATEGORIES[5];
+      if (!itemsByCategory[cat]) {
+        itemsByCategory[cat] = [];
+      }
+      itemsByCategory[cat].push(item);
+    });
 
-          <ScrollView style={{ flex: 1, marginVertical: 6 }}>
-            {packingItems.map(item => (
-              <TouchableOpacity
-                key={item.id}
-                style={[rowDirectionStyle, { alignItems: 'center', paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#f8f9fa' }]}
-                onPress={() => {
-                  setPackingItems(prev => prev.map(p => p.id === item.id ? { ...p, checked: !p.checked } : p));
-                }}
-                activeOpacity={0.7}
-              >
-                <Text style={{ fontSize: 16, marginRight: isRTL ? 0 : 10, marginLeft: isRTL ? 10 : 0 }}>
-                  {item.checked ? '✅' : '⬜'}
-                </Text>
-                <Text style={{ fontSize: 13, color: item.checked ? '#868e96' : '#212529', textDecorationLine: item.checked ? 'line-through' : 'none', flex: 1 }}>
-                  {item.title}
-                </Text>
+    const activeCategories = Object.keys(itemsByCategory);
+    const totalPackedCount = dbPackingItems.filter(i => i.isPacked).length;
+    const totalItemsCount = dbPackingItems.length;
+
+    const handleTogglePacked = async (item: PackingItem) => {
+      const updatedStatus = !item.isPacked;
+      setDbPackingItems(prev => prev.map(p => p.id === item.id ? { ...p, isPacked: updatedStatus } : p));
+      try {
+        await updatePackingItemPacked(item.id, updatedStatus);
+      } catch (err) {
+        console.error('Error updating packing item status:', err);
+      }
+    };
+
+    const handleDeleteItem = async (itemId: string) => {
+      setDbPackingItems(prev => prev.filter(p => p.id !== itemId));
+      try {
+        await deletePackingItem(itemId);
+      } catch (err) {
+        console.error('Error deleting packing item:', err);
+      }
+    };
+
+    const handleAddNewItem = async () => {
+      const titleClean = newPackingItemText.trim();
+      if (!titleClean) return;
+      const targetCat = selectedAddCategory || categoriesToUse[0] || DEFAULT_PACKING_CATEGORIES[5];
+      
+      const tempId = Date.now().toString();
+      const newItem: PackingItem = {
+        id: tempId,
+        tripId,
+        itemName: titleClean,
+        category: targetCat,
+        isPacked: false,
+      };
+      setDbPackingItems(prev => [...prev, newItem]);
+      setNewPackingItemText('');
+
+      try {
+        const saved = await createPackingItem(tripId, titleClean, targetCat);
+        setDbPackingItems(prev => prev.map(p => p.id === tempId ? saved : p));
+      } catch (err) {
+        console.error('Error creating packing item:', err);
+      }
+    };
+
+    const handleAddQuickCategory = async () => {
+      const catClean = newQuickCategoryText.trim();
+      if (!catClean) return;
+      if (categoriesToUse.includes(catClean)) {
+        setIsAddingCategoryInline(false);
+        setSelectedAddCategory(catClean);
+        return;
+      }
+      const updatedCats = [...categoriesToUse, catClean];
+      setTripPackingCategories(updatedCats);
+      setSelectedAddCategory(catClean);
+      setNewQuickCategoryText('');
+      setIsAddingCategoryInline(false);
+
+      try {
+        await updateTripSettings(tripId, tripBaseCurrency || 'USD', tripExchangeRate || 1.0, tripTimeFormat, tripCurrenciesTable, updatedCats);
+      } catch (err) {
+        console.error('Error saving new packing category:', err);
+      }
+    };
+
+    return (
+      <Modal
+        visible={isPackingModalVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setIsPackingModalVisible(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+          <View style={{ width: '90%', maxWidth: 580, backgroundColor: '#ffffff', borderRadius: 16, padding: 22, maxHeight: '85%', elevation: 5 }}>
+            {/* Header */}
+            <View style={[rowDirectionStyle, { justifyContent: 'space-between', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#f1f3f5', paddingBottom: 12, marginBottom: 12 }]}>
+              <View style={[rowDirectionStyle, { alignItems: 'center', gap: 8 }]}>
+                <Text style={{ fontSize: 20 }}>🎒</Text>
+                <View>
+                  <Text style={{ fontSize: 17, fontWeight: 'bold', color: colors.primary }}>
+                    {isRTL ? 'רשימת אריזה וציוד' : 'Packing & Equipment List'}
+                  </Text>
+                  <Text style={{ fontSize: 11, color: '#868e96', fontWeight: 'bold' }}>
+                    {isRTL ? `נארזו ${totalPackedCount} מתוך ${totalItemsCount} פריטים` : `Packed ${totalPackedCount} of ${totalItemsCount} items`}
+                  </Text>
+                </View>
+              </View>
+              <TouchableOpacity onPress={() => setIsPackingModalVisible(false)} style={{ padding: 4 }}>
+                <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#868e96' }}>✕</Text>
               </TouchableOpacity>
-            ))}
-          </ScrollView>
+            </View>
 
-          <TouchableOpacity
-            style={{ backgroundColor: '#f1f3f5', paddingVertical: 10, borderRadius: 8, alignItems: 'center', marginTop: 10 }}
-            onPress={() => setIsPackingModalVisible(false)}
-          >
-            <Text style={{ color: '#495057', fontWeight: 'bold', fontSize: 13 }}>{isRTL ? 'סגור' : 'Close'}</Text>
-          </TouchableOpacity>
+            {/* Input & Category Selection Section */}
+            <View style={{ backgroundColor: '#f8f9fa', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#e9ecef', marginBottom: 14 }}>
+              <Text style={[styles.modalFormLabel, textAlignStyle, { fontSize: 12, color: colors.primary, fontWeight: 'bold', marginBottom: 6 }]}>
+                ➕ {isRTL ? 'הוספת פריט ציוד חדש:' : 'Add New Item:'}
+              </Text>
+
+              <View style={[rowDirectionStyle, { gap: 8, marginBottom: 8 }]}>
+                <TextInput
+                  style={[styles.modalFormInput, textAlignStyle, { flex: 1, height: 40, backgroundColor: '#fff' }]}
+                  placeholder={isRTL ? 'שם הפריט (למשל: מטען, דרכון, גרביים)...' : 'Item name (e.g. Passport, Charger)...'}
+                  value={newPackingItemText}
+                  onChangeText={setNewPackingItemText}
+                />
+                <TouchableOpacity
+                  style={{ backgroundColor: colors.primary, paddingHorizontal: 16, borderRadius: 8, justifyContent: 'center', alignItems: 'center' }}
+                  onPress={handleAddNewItem}
+                  activeOpacity={0.8}
+                >
+                  <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 13 }}>+ {isRTL ? 'הוסף' : 'Add'}</Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Category selector row */}
+              <View style={[rowDirectionStyle, { alignItems: 'center', justifyContent: 'space-between' }]}>
+                <Text style={{ fontSize: 12, fontWeight: 'bold', color: '#495057' }}>
+                  🏷️ {isRTL ? 'שיוך לקטגוריה:' : 'Category:'}
+                </Text>
+                {Platform.OS === 'web' ? (
+                  <select
+                    value={selectedAddCategory || categoriesToUse[0]}
+                    onChange={(e) => {
+                      if (e.target.value === '__ADD_NEW__') {
+                        setIsAddingCategoryInline(true);
+                      } else {
+                        setSelectedAddCategory(e.target.value);
+                      }
+                    }}
+                    style={{
+                      backgroundColor: '#ffffff',
+                      border: '1px solid #dee2e6',
+                      borderRadius: '6px',
+                      padding: '4px 8px',
+                      fontSize: '12px',
+                      fontWeight: 'bold',
+                      color: colors.primary,
+                      cursor: 'pointer'
+                    }}
+                  >
+                    {categoriesToUse.map(cat => (
+                      <option key={cat} value={cat}>{cat}</option>
+                    ))}
+                    <option value="__ADD_NEW__">+ {isRTL ? 'הוסף קטגוריה חדשה...' : 'Add new category...'}</option>
+                  </select>
+                ) : (
+                  <TouchableOpacity
+                    onPress={() => setIsAddingCategoryInline(!isAddingCategoryInline)}
+                    style={{ paddingVertical: 4, paddingHorizontal: 8, backgroundColor: '#e7f5ff', borderRadius: 6, borderWidth: 1, borderColor: '#74c0fc' }}
+                  >
+                    <Text style={{ fontSize: 12, fontWeight: 'bold', color: colors.primary }}>
+                      {selectedAddCategory || categoriesToUse[0]} ✏️
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+
+              {/* Inline Add Category input */}
+              {isAddingCategoryInline && (
+                <View style={[rowDirectionStyle, { gap: 6, marginTop: 8 }]}>
+                  <TextInput
+                    style={[styles.modalFormInput, textAlignStyle, { flex: 1, height: 36, fontSize: 12, backgroundColor: '#fff' }]}
+                    placeholder={isRTL ? 'שם הקטגוריה החדשה...' : 'New category name...'}
+                    value={newQuickCategoryText}
+                    onChangeText={setNewQuickCategoryText}
+                  />
+                  <TouchableOpacity
+                    style={{ backgroundColor: '#2b8a3e', paddingHorizontal: 12, borderRadius: 6, justifyContent: 'center' }}
+                    onPress={handleAddQuickCategory}
+                  >
+                    <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 12 }}>{isRTL ? 'אישור' : 'OK'}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={{ backgroundColor: '#f1f3f5', paddingHorizontal: 10, borderRadius: 6, justifyContent: 'center' }}
+                    onPress={() => setIsAddingCategoryInline(false)}
+                  >
+                    <Text style={{ color: '#495057', fontSize: 12 }}>✕</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+
+            {/* Categorized ScrollView Items List */}
+            <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={true}>
+              {activeCategories.map((categoryName) => {
+                const categoryItems = itemsByCategory[categoryName] || [];
+                const packedInCat = categoryItems.filter(i => i.isPacked).length;
+                const isCollapsed = collapsedPackingCategories[categoryName];
+
+                return (
+                  <View key={categoryName} style={{ marginBottom: 12, backgroundColor: '#ffffff', borderRadius: 10, borderWidth: 1, borderColor: '#f1f3f5', overflow: 'hidden' }}>
+                    {/* Category Header */}
+                    <TouchableOpacity
+                      style={[rowDirectionStyle, {
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        backgroundColor: '#f8f9fa',
+                        paddingHorizontal: 12,
+                        paddingVertical: 8,
+                        borderBottomWidth: isCollapsed ? 0 : 1,
+                        borderBottomColor: '#e9ecef'
+                      }]}
+                      onPress={() => {
+                        setCollapsedPackingCategories(prev => ({
+                          ...prev,
+                          [categoryName]: !prev[categoryName]
+                        }));
+                      }}
+                      activeOpacity={0.7}
+                    >
+                      <View style={[rowDirectionStyle, { alignItems: 'center', gap: 6 }]}>
+                        <Text style={{ fontSize: 12, color: colors.primary, fontWeight: 'bold' }}>
+                          {isCollapsed ? '►' : '▼'}
+                        </Text>
+                        <Text style={{ fontSize: 14, fontWeight: 'bold', color: '#212529' }}>
+                          {categoryName}
+                        </Text>
+                        <Text style={{ fontSize: 11, color: '#868e96', fontWeight: '500' }}>
+                          ({packedInCat}/{categoryItems.length})
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+
+                    {/* Category Items */}
+                    {!isCollapsed && (
+                      <View style={{ paddingHorizontal: 12, paddingVertical: 4 }}>
+                        {categoryItems.length === 0 ? (
+                          <Text style={{ fontSize: 12, color: '#adb5bd', fontStyle: 'italic', paddingVertical: 8, textAlign: isRTL ? 'right' : 'left' }}>
+                            {isRTL ? 'אין פריטים בקטגוריה זו עדיין' : 'No items in this category yet'}
+                          </Text>
+                        ) : (
+                          categoryItems.map(item => (
+                            <View
+                              key={item.id}
+                              style={[rowDirectionStyle, { justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#f8f9fa' }]}
+                            >
+                              <TouchableOpacity
+                                style={[rowDirectionStyle, { alignItems: 'center', flex: 1 }]}
+                                onPress={() => handleTogglePacked(item)}
+                                activeOpacity={0.7}
+                              >
+                                <Text style={{ fontSize: 16, marginRight: isRTL ? 0 : 10, marginLeft: isRTL ? 10 : 0 }}>
+                                  {item.isPacked ? '✅' : '⬜'}
+                                </Text>
+                                <Text style={{ fontSize: 13, color: item.isPacked ? '#868e96' : '#212529', textDecorationLine: item.isPacked ? 'line-through' : 'none', flex: 1 }}>
+                                  {item.itemName}
+                                </Text>
+                              </TouchableOpacity>
+
+                              <TouchableOpacity onPress={() => handleDeleteItem(item.id)} style={{ padding: 4 }}>
+                                <Text style={{ fontSize: 13, color: '#adb5bd' }}>🗑️</Text>
+                              </TouchableOpacity>
+                            </View>
+                          ))
+                        )}
+                      </View>
+                    )}
+                  </View>
+                );
+              })}
+            </ScrollView>
+
+            <TouchableOpacity
+              style={{ backgroundColor: '#f1f3f5', paddingVertical: 10, borderRadius: 8, alignItems: 'center', marginTop: 12 }}
+              onPress={() => setIsPackingModalVisible(false)}
+            >
+              <Text style={{ color: '#495057', fontWeight: 'bold', fontSize: 13 }}>{isRTL ? 'סגור' : 'Close'}</Text>
+            </TouchableOpacity>
+          </View>
         </View>
-      </View>
-    </Modal>
-  );
+      </Modal>
+    );
+  };
 
   const renderExpensePageModal = () => (
     <Modal
