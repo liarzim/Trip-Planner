@@ -640,6 +640,7 @@ export default function TripDashboardScreen() {
     setEventBookingReference('');
     setEventDescription('');
     setEventCost('');
+    setEventCurrency(tripBaseCurrency || 'USD');
     setEventAirline('');
     setEventFlightNumber('');
     setEventDepartureTime('');
@@ -697,6 +698,7 @@ export default function TripDashboardScreen() {
     setEventQrCodeUrl(item.qrCodeUrl || '');
     setEventTransportMode((item.transportMode as 'driving' | 'transit') || '');
     setEventCost(item.cost !== undefined ? item.cost.toString() : '');
+    setEventCurrency(tripBaseCurrency || 'USD');
     setHasKomootTrack(!!item.hasKomootTrack && !!item.komootTrackUrl);
     setKomootTrackUrl(item.komootTrackUrl || '');
     setHasQrCode(!!item.hasQrCode || !!item.qrCodeUrl);
@@ -2529,8 +2531,9 @@ export default function TripDashboardScreen() {
           <Text style={{ fontSize: 10, color: '#b7e4c7', fontWeight: 'bold' }}>
             {isRTL ? 'סה"כ הוצאות' : 'TOTAL SPENT'}
           </Text>
-          <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#ffffff', marginTop: 1 }}>
-            ₪{totalSpent.toFixed(2)} ILS
+          <Text style={{ fontSize: 16, fontWeight: 'bold', color: '#ffffff', marginTop: 1 }}>
+            {getCurrencySymbol(tripBaseCurrency, tripCurrenciesTable)}{totalSpent.toFixed(2)} {tripBaseCurrency || 'USD'}
+            {typeof tripExchangeRate === 'number' && tripBaseCurrency !== 'ILS' ? ` (₪${totalSpentInILS.toFixed(2)})` : ''}
           </Text>
         </View>
       </View>
