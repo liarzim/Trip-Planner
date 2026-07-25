@@ -396,6 +396,20 @@ export default function TripDashboardScreen() {
   // Weather States
   const [weatherForecast, setWeatherForecast] = useState<any>(null);
   const [loadingWeather, setLoadingWeather] = useState(false);
+  const [selectedWeatherDay, setSelectedWeatherDay] = useState<any>(null);
+  const [isWeatherModalVisible, setIsWeatherModalVisible] = useState(false);
+
+  const formatDdMm = (dateStr?: string): string => {
+    if (!dateStr) return '';
+    try {
+      const parts = dateStr.split('T')[0].split('-');
+      if (parts.length === 3) {
+        const [, mm, dd] = parts;
+        return `${dd}/${mm}`;
+      }
+    } catch (e) {}
+    return dateStr;
+  };
 
   // Fetch events, expenses, and documents in parallel on screen focus
   useFocusEffect(
@@ -2422,6 +2436,133 @@ export default function TripDashboardScreen() {
     );
   };
 
+  const renderDetailedWeatherModal = () => {
+    if (!selectedWeatherDay) return null;
+
+    const dayDateStr = selectedWeatherDay.date || '';
+    const ddMm = formatDdMm(dayDateStr);
+    
+    const getStatusText = (status: string) => {
+      switch (status) {
+        case 'sunny': return isRTL ? 'שמשי בהיר ☀️' : 'Sunny ☀️';
+        case 'cloudy': return isRTL ? 'מעונן ☁️' : 'Cloudy ☁️';
+        case 'rainy': return isRTL ? 'גשום 🌧️' : 'Rainy 🌧️';
+        case 'snowy': return isRTL ? 'מושלג ❄️' : 'Snowy ❄️';
+        case 'stormy': return isRTL ? 'סוער ⛈️' : 'Stormy ⛈️';
+        default: return isRTL ? 'בהיר ☀️' : 'Clear ☀️';
+      }
+    };
+
+    return (
+      <Modal
+        visible={isWeatherModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setIsWeatherModalVisible(false)}
+      >
+        <View style={{
+          flex: 1,
+          backgroundColor: 'rgba(0, 0, 0, 0.75)',
+          justifyContent: 'center',
+          alignItems: 'center',
+          padding: 20,
+        }}>
+          <View style={{
+            width: '90%',
+            maxWidth: 460,
+            backgroundColor: '#ffffff',
+            borderRadius: 16,
+            padding: 22,
+            alignItems: 'center',
+            elevation: 6,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.25,
+            shadowRadius: 8,
+          }}>
+            {/* Modal Header */}
+            <View style={[rowDirectionStyle, { justifyContent: 'space-between', alignItems: 'center', width: '100%', borderBottomWidth: 1, borderBottomColor: '#f1f3f5', paddingBottom: 10, marginBottom: 16 }]}>
+              <View style={[rowDirectionStyle, { alignItems: 'center', gap: 6 }]}>
+                <Text style={{ fontSize: 20 }}>🌤️</Text>
+                <Text style={{ fontSize: 16, fontWeight: 'bold', color: colors.primary }}>
+                  {isRTL ? `תחזית מזג אוויר מפורטת (${ddMm})` : `Detailed Weather Forecast (${ddMm})`}
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => setIsWeatherModalVisible(false)} style={{ padding: 4 }}>
+                <Text style={{ fontSize: 18, fontWeight: 'bold', color: '#868e96' }}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Main Weather Card Summary */}
+            <View style={{ backgroundColor: '#e7f5ff', borderRadius: 14, padding: 16, width: '100%', alignItems: 'center', borderWidth: 1, borderColor: '#a5d8ff', marginBottom: 16 }}>
+              <Text style={{ fontSize: 13, fontWeight: 'bold', color: '#1971c2', marginBottom: 4 }}>
+                📅 {dayDateStr} ({ddMm})
+              </Text>
+              <View style={[rowDirectionStyle, { alignItems: 'center', gap: 10, marginVertical: 6 }]}>
+                <Text style={{ fontSize: 36 }}>{getWeatherEmoji(selectedWeatherDay.status)}</Text>
+                <Text style={{ fontSize: 32, fontWeight: 'bold', color: '#0b7285' }}>
+                  {selectedWeatherDay.temp}°C
+                </Text>
+              </View>
+              <Text style={{ fontSize: 14, fontWeight: 'bold', color: '#1864ab' }}>
+                {getStatusText(selectedWeatherDay.status)}
+              </Text>
+            </View>
+
+            {/* Detailed Grid Stats */}
+            <View style={{ width: '100%', gap: 10, marginBottom: 16 }}>
+              <View style={[rowDirectionStyle, { justifyContent: 'space-between', backgroundColor: '#f8f9fa', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#f1f3f5' }]}>
+                <Text style={{ fontSize: 13, color: '#495057', fontWeight: 'bold' }}>
+                  🌅 {isRTL ? 'טמפרטורת בוקר:' : 'Morning Temp:'}
+                </Text>
+                <Text style={{ fontSize: 13, fontWeight: 'bold', color: '#212529' }}>
+                  {selectedWeatherDay.morningTemp}°C
+                </Text>
+              </View>
+
+              <View style={[rowDirectionStyle, { justifyContent: 'space-between', backgroundColor: '#f8f9fa', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#f1f3f5' }]}>
+                <Text style={{ fontSize: 13, color: '#495057', fontWeight: 'bold' }}>
+                  🌃 {isRTL ? 'טמפרטורת ערב:' : 'Evening Temp:'}
+                </Text>
+                <Text style={{ fontSize: 13, fontWeight: 'bold', color: '#212529' }}>
+                  {selectedWeatherDay.eveningTemp}°C
+                </Text>
+              </View>
+
+              <View style={[rowDirectionStyle, { justifyContent: 'space-between', backgroundColor: '#f8f9fa', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#f1f3f5' }]}>
+                <Text style={{ fontSize: 13, color: '#495057', fontWeight: 'bold' }}>
+                  💧 {isRTL ? 'אחוזי לחות:' : 'Humidity:'}
+                </Text>
+                <Text style={{ fontSize: 13, fontWeight: 'bold', color: '#212529' }}>
+                  {selectedWeatherDay.humidity || 50}%
+                </Text>
+              </View>
+
+              <View style={[rowDirectionStyle, { justifyContent: 'space-between', backgroundColor: '#f8f9fa', padding: 12, borderRadius: 10, borderWidth: 1, borderColor: '#f1f3f5' }]}>
+                <Text style={{ fontSize: 13, color: '#495057', fontWeight: 'bold' }}>
+                  💨 {isRTL ? 'מהירות רוח:' : 'Wind Speed:'}
+                </Text>
+                <Text style={{ fontSize: 13, fontWeight: 'bold', color: '#212529' }}>
+                  {selectedWeatherDay.windSpeed || 3.5} m/s
+                </Text>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={{ backgroundColor: colors.primary, paddingVertical: 10, paddingHorizontal: 24, borderRadius: 8, width: '100%', alignItems: 'center' }}
+              onPress={() => setIsWeatherModalVisible(false)}
+              activeOpacity={0.8}
+            >
+              <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 13 }}>
+                {isRTL ? 'סגור' : 'Close'}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+    );
+  };
+
   const renderPackingListModal = () => {
     const rawCategories = tripPackingCategories && tripPackingCategories.length > 0
       ? tripPackingCategories
@@ -3090,20 +3231,30 @@ export default function TripDashboardScreen() {
         {weatherForecast && weatherForecast.daily && (
           <View style={{ flexDirection: isRTL ? 'row-reverse' : 'row', gap: 6 }}>
             {weatherForecast.daily.slice(0, 5).map((day: any, idx: number) => {
+              const ddMm = formatDdMm(day.date);
               return (
-                <View key={idx} style={{
-                  backgroundColor: '#f8f9fa',
-                  borderRadius: 8,
-                  paddingHorizontal: 8,
-                  paddingVertical: 4,
-                  alignItems: 'center',
-                  borderWidth: 1,
-                  borderColor: '#e9ecef',
-                  minWidth: 52,
-                }}>
+                <TouchableOpacity
+                  key={idx}
+                  style={{
+                    backgroundColor: '#f8f9fa',
+                    borderRadius: 8,
+                    paddingHorizontal: 8,
+                    paddingVertical: 4,
+                    alignItems: 'center',
+                    borderWidth: 1,
+                    borderColor: '#e9ecef',
+                    minWidth: 52,
+                  }}
+                  onPress={() => {
+                    setSelectedWeatherDay(day);
+                    setIsWeatherModalVisible(true);
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Text style={{ fontSize: 10, fontWeight: 'bold', color: '#1971c2', marginBottom: 1 }}>{ddMm}</Text>
                   <Text style={{ fontSize: 13 }}>{getWeatherEmoji(day.status)}</Text>
                   <Text style={{ fontSize: 11, fontWeight: 'bold', color: '#343a40' }}>{day.temp}°C</Text>
-                </View>
+                </TouchableOpacity>
               );
             })}
           </View>
@@ -3139,10 +3290,19 @@ export default function TripDashboardScreen() {
           <View style={[styles.webWeatherDaysRow, { flexDirection: isRTL ? 'row-reverse' : 'row' }]}>
             {weatherForecast.daily.map((day: any, idx: number) => {
               const dayName = new Date(day.date + 'T00:00:00').toLocaleDateString(isRTL ? 'he-IL' : 'en-US', { weekday: 'short' });
+              const ddMm = formatDdMm(day.date);
               return (
-                <View key={idx} style={styles.webWeatherDayCard}>
+                <TouchableOpacity
+                  key={idx}
+                  style={[styles.webWeatherDayCard, { cursor: 'pointer' }]}
+                  onPress={() => {
+                    setSelectedWeatherDay(day);
+                    setIsWeatherModalVisible(true);
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.webWeatherDayName, { color: colors.primary, fontWeight: 'bold' }]}>{ddMm}</Text>
                   <Text style={styles.webWeatherDayName}>{dayName}</Text>
-                  <Text style={styles.webWeatherDate}>{day.date.split('-').slice(1).join('/')}</Text>
                   <Text style={styles.webWeatherEmoji}>{getWeatherEmoji(day.status)}</Text>
                   <Text style={styles.webWeatherTemp}>{day.temp}°C</Text>
                   <Text style={styles.webWeatherRange}>🌅 {day.morningTemp}° / 🌃 {day.eveningTemp}°</Text>
@@ -3150,7 +3310,7 @@ export default function TripDashboardScreen() {
                     <Text style={styles.webWeatherDetailText}>💧 {day.humidity}%</Text>
                     <Text style={styles.webWeatherDetailText}>💨 {day.windSpeed}m/s</Text>
                   </View>
-                </View>
+                </TouchableOpacity>
               );
             })}
           </View>
@@ -3515,6 +3675,9 @@ export default function TripDashboardScreen() {
 
       {/* Enlarged Photo Popup Modal */}
       {renderPhotoPopupModal()}
+
+      {/* Detailed Weather Popup Modal */}
+      {renderDetailedWeatherModal()}
 
       {/* Packing List Modal */}
       {renderPackingListModal()}
