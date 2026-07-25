@@ -4619,91 +4619,6 @@ export default function TripDashboardScreen() {
                     ) : null}
                   </View>
 
-                  {/* QR Code Toggle & Image Upload Section */}
-                  <View style={{
-                    marginBottom: 16,
-                    backgroundColor: hasQrCode ? '#e6fcf5' : '#f8f9fa',
-                    padding: 14,
-                    borderRadius: 12,
-                    borderWidth: 1,
-                    borderColor: hasQrCode ? '#96f2d7' : '#dee2e6'
-                  }}>
-                    <View style={[rowDirectionStyle, { alignItems: 'center', justifyContent: 'space-between' }]}>
-                      <Text style={[styles.modalFormLabel, textAlignStyle, { marginBottom: 0, fontWeight: 'bold', fontSize: 14, color: '#0ca678' }]}>
-                        🎫 {isRTL ? 'קוד QR לכרטיס' : 'Ticket QR Code'}
-                      </Text>
-                      <TouchableOpacity
-                        style={{
-                          flexDirection: 'row',
-                          alignItems: 'center',
-                          backgroundColor: hasQrCode ? '#12b886' : '#ced4da',
-                          borderRadius: 20,
-                          paddingVertical: 6,
-                          paddingHorizontal: 14,
-                        }}
-                        onPress={() => {
-                          const next = !hasQrCode;
-                          setHasQrCode(next);
-                          if (!next) setEventQrCodeUrl('');
-                        }}
-                        activeOpacity={0.8}
-                      >
-                        <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 12 }}>
-                          {hasQrCode ? (isRTL ? 'מופעל (ON)' : 'ON') : (isRTL ? 'כבוי (OFF)' : 'OFF')}
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
-
-                    {hasQrCode && (
-                      <View style={{ marginTop: 12 }}>
-                        <Text style={[styles.modalFormLabel, textAlignStyle, { fontSize: 12, color: '#495057' }]}>
-                          {isRTL ? 'העלה תמונת QR (PNG, JPG, JPEG) או הזן טקסט/קישור' : 'Upload QR Picture (PNG, JPG, JPEG) or enter text/link'}
-                        </Text>
-                        <View style={[rowDirectionStyle, { alignItems: 'center', marginBottom: 6 }]}>
-                          <TextInput
-                            style={[styles.modalFormInput, textAlignStyle, { flex: 1, backgroundColor: '#ffffff', borderColor: '#12b886' }]}
-                            placeholder={isRTL ? 'הזן טקסט/קישור או העלה תמונה' : 'Enter text/URL or upload image'}
-                            value={isImageQr(eventQrCodeUrl) ? (isRTL ? '[תמונת QR הועלתה]' : '[QR Image Uploaded]') : eventQrCodeUrl}
-                            onChangeText={setEventQrCodeUrl}
-                          />
-                          <TouchableOpacity
-                            style={[
-                              styles.actionBtn,
-                              { 
-                                backgroundColor: '#12b886', 
-                                paddingVertical: 10, 
-                                paddingHorizontal: 12, 
-                                marginLeft: isRTL ? 0 : 8, 
-                                marginRight: isRTL ? 8 : 0 
-                              }
-                            ]}
-                            onPress={handlePickQrImage}
-                            disabled={uploadingQrImage}
-                            activeOpacity={0.8}
-                          >
-                            {uploadingQrImage ? (
-                              <ActivityIndicator size="small" color="#ffffff" />
-                            ) : (
-                              <Text style={[styles.actionBtnText, { color: '#ffffff', fontWeight: 'bold' }]}>
-                                📷 {isRTL ? 'העלה תמונה' : 'Upload Image'}
-                              </Text>
-                            )}
-                          </TouchableOpacity>
-                        </View>
-
-                        {isImageQr(eventQrCodeUrl) && (
-                          <View style={{ alignItems: 'center', marginVertical: 6, backgroundColor: '#ffffff', padding: 8, borderRadius: 8, borderWidth: 1, borderColor: '#96f2d7' }}>
-                            <Image source={{ uri: eventQrCodeUrl }} style={{ width: 100, height: 100, resizeMode: 'contain' }} />
-                            <TouchableOpacity onPress={() => setEventQrCodeUrl('')}>
-                              <Text style={{ color: '#e03131', fontSize: 12, marginTop: 4, fontWeight: 'bold' }}>
-                                🗑️ {isRTL ? 'הסר תמונה' : 'Remove Image'}
-                              </Text>
-                            </TouchableOpacity>
-                          </View>
-                        )}
-                      </View>
-                    )}
-                  </View>
 
                   <View style={{ marginBottom: 12 }}>
                     <Text style={[styles.modalFormLabel, textAlignStyle]}>
@@ -4781,6 +4696,92 @@ export default function TripDashboardScreen() {
                   </View>
                 </View>
               )}
+
+              {/* Ticket QR Code Toggle & Image Upload Section (Available for all Event Types: Flight, Hotel, Waypoint) */}
+              <View style={{
+                marginBottom: 16,
+                backgroundColor: hasQrCode ? '#e6fcf5' : '#f8f9fa',
+                padding: 14,
+                borderRadius: 12,
+                borderWidth: 1,
+                borderColor: hasQrCode ? '#96f2d7' : '#dee2e6'
+              }}>
+                <View style={[rowDirectionStyle, { alignItems: 'center', justifyContent: 'space-between' }]}>
+                  <Text style={[styles.modalFormLabel, textAlignStyle, { marginBottom: 0, fontWeight: 'bold', fontSize: 14, color: '#0ca678' }]}>
+                    🎫 {isRTL ? 'קוד QR לכרטיס / כרטיס טיסה/מלון' : 'Ticket / Booking QR Code'}
+                  </Text>
+                  <TouchableOpacity
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      backgroundColor: hasQrCode ? '#12b886' : '#ced4da',
+                      borderRadius: 20,
+                      paddingVertical: 6,
+                      paddingHorizontal: 14,
+                    }}
+                    onPress={() => {
+                      const next = !hasQrCode;
+                      setHasQrCode(next);
+                      if (!next) setEventQrCodeUrl('');
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 12 }}>
+                      {hasQrCode ? (isRTL ? 'מופעל (ON)' : 'ON') : (isRTL ? 'כבוי (OFF)' : 'OFF')}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                {hasQrCode && (
+                  <View style={{ marginTop: 12 }}>
+                    <Text style={[styles.modalFormLabel, textAlignStyle, { fontSize: 12, color: '#495057' }]}>
+                      {isRTL ? 'העלה תמונת קוד QR (PNG, JPG, JPEG) או הזן טקסט/קישור' : 'Upload QR Picture (PNG, JPG, JPEG) or enter text/link'}
+                    </Text>
+                    <View style={[rowDirectionStyle, { alignItems: 'center', marginBottom: 6 }]}>
+                      <TextInput
+                        style={[styles.modalFormInput, textAlignStyle, { flex: 1, backgroundColor: '#ffffff', borderColor: '#12b886' }]}
+                        placeholder={isRTL ? 'הזן טקסט/קישור או העלה תמונה' : 'Enter text/URL or upload image'}
+                        value={isImageQr(eventQrCodeUrl) ? (isRTL ? '[תמונת QR הועלתה]' : '[QR Image Uploaded]') : eventQrCodeUrl}
+                        onChangeText={setEventQrCodeUrl}
+                      />
+                      <TouchableOpacity
+                        style={[
+                          styles.actionBtn,
+                          { 
+                            backgroundColor: '#12b886', 
+                            paddingVertical: 10, 
+                            paddingHorizontal: 12, 
+                            marginLeft: isRTL ? 0 : 8, 
+                            marginRight: isRTL ? 8 : 0 
+                          }
+                        ]}
+                        onPress={handlePickQrImage}
+                        disabled={uploadingQrImage}
+                        activeOpacity={0.8}
+                      >
+                        {uploadingQrImage ? (
+                          <ActivityIndicator size="small" color="#ffffff" />
+                        ) : (
+                          <Text style={[styles.actionBtnText, { color: '#ffffff', fontWeight: 'bold' }]}>
+                            📷 {isRTL ? 'העלה תמונה' : 'Upload Image'}
+                          </Text>
+                        )}
+                      </TouchableOpacity>
+                    </View>
+
+                    {isImageQr(eventQrCodeUrl) && (
+                      <View style={{ alignItems: 'center', marginVertical: 6, backgroundColor: '#ffffff', padding: 8, borderRadius: 8, borderWidth: 1, borderColor: '#96f2d7' }}>
+                        <Image source={{ uri: eventQrCodeUrl }} style={{ width: 100, height: 100, resizeMode: 'contain' }} />
+                        <TouchableOpacity onPress={() => setEventQrCodeUrl('')}>
+                          <Text style={{ color: '#e03131', fontSize: 12, marginTop: 4, fontWeight: 'bold' }}>
+                            🗑️ {isRTL ? 'הסר תמונה' : 'Remove Image'}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                  </View>
+                )}
+              </View>
 
               {/* Komoot Track Toggle & Link Input */}
               <View style={{
