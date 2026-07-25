@@ -21,6 +21,7 @@ import { getDocumentAsync } from 'expo-document-picker';
 import QRCode from 'react-native-qrcode-svg';
 import * as Sharing from 'expo-sharing';
 import * as FileSystem from 'expo-file-system/legacy';
+import * as ImagePicker from 'expo-image-picker';
 import { RootStackParamList } from '../navigation/AppNavigator';
 import { getEventsForTrip, getExpensesForTrip, getDocumentsForTrip, saveDocument, getTrip, createEvent, updateEvent, deleteEvent, updateTripSettings, createExpense, getPackingItemsForTrip, createPackingItem, updatePackingItemPacked, deletePackingItem, DEFAULT_PACKING_CATEGORIES } from '../services/dbService';
 import { uploadTripDocument } from '../services/storageService';
@@ -153,6 +154,90 @@ export default function TripDashboardScreen() {
   const [galleryCurrentIndex, setGalleryCurrentIndex] = useState(0);
   const [isPhotoPopupVisible, setIsPhotoPopupVisible] = useState(false);
   const [popupImageUri, setPopupImageUri] = useState('');
+
+  // Event Gallery Images State & Camera / Google Photos Handlers
+  const [eventGalleryImages, setEventGalleryImages] = useState<string[]>([]);
+
+  const handlePickEventImageGallery = async () => {
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        alert(isRTL ? 'נדרשת הרשאה לגישה לגלריית התמונות' : 'Media library permission required');
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ['images'],
+        allowsMultipleSelection: true,
+        quality: 0.7,
+        base64: true,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const newImages = result.assets.map((asset) =>
+          asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : asset.uri
+        );
+        setEventGalleryImages((prev) => [...prev, ...newImages]);
+      }
+    } catch (err) {
+      console.error('Failed to pick gallery images:', err);
+    }
+  };
+
+  const handleCaptureEventImageCamera = async () => {
+    try {
+      const permission = await ImagePicker.requestCameraPermissionsAsync();
+      if (!permission.granted) {
+        alert(isRTL ? 'נדרשת הרשאה לגישה למצלמה' : 'Camera permission required');
+        return;
+      }
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ['images'],
+        allowsEditing: true,
+        quality: 0.7,
+        base64: true,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const asset = result.assets[0];
+        const imgUri = asset.base64 ? `data:image/jpeg;base64,${asset.base64}` : asset.uri;
+        setEventGalleryImages((prev) => [...prev, imgUri]);
+      }
+    } catch (err) {
+      console.error('Failed to capture camera image:', err);
+    }
+  };
+
+  const handleRemoveEventImage = (index: number) => {
+    setEventGalleryImages((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleUploadToGooglePhotos = async (photoUri?: string) => {
+    if (!photoUri) return;
+    try {
+      if (Platform.OS !== 'web') {
+        const canShare = await Sharing.isAvailableAsync();
+        if (canShare) {
+          await Sharing.shareAsync(photoUri, {
+            dialogTitle: isRTL ? 'העלאה ל-Google Photos / שתף' : 'Upload to Google Photos / Share',
+            mimeType: 'image/jpeg',
+          });
+          return;
+        }
+      }
+      const googlePhotosUrl = 'https://photos.google.com/upload';
+      if (Platform.OS === 'web' && typeof window !== 'undefined') {
+        window.open(googlePhotosUrl, '_blank');
+      } else {
+        Linking.openURL(googlePhotosUrl).catch(console.error);
+      }
+    } catch (err) {
+      console.error('Error sharing to Google Photos:', err);
+      Alert.alert(
+        isRTL ? 'Google Photos' : 'Google Photos',
+        isRTL ? 'פתח את photos.google.com בדפדפן להעלאה.' : 'Open photos.google.com in browser to upload.'
+      );
+    }
+  };
 
   const [isHamburgerMenuOpen, setIsHamburgerMenuOpen] = useState(false);
   const [isPackingModalVisible, setIsPackingModalVisible] = useState(false);
@@ -730,6 +815,7 @@ export default function TripDashboardScreen() {
     setHasKomootTrack(false);
     setKomootTrackUrl('');
     setHasQrCode(false);
+    setEventGalleryImages([]);
     setGeocodingSuccessMsg('');
     setGeocodingOriginSuccessMsg('');
     setGeocodingDestSuccessMsg('');
@@ -773,6 +859,7 @@ export default function TripDashboardScreen() {
     setHasKomootTrack(!!item.hasKomootTrack && !!item.komootTrackUrl);
     setKomootTrackUrl(item.komootTrackUrl || '');
     setHasQrCode(!!item.hasQrCode || !!item.qrCodeUrl);
+    setEventGalleryImages(item.galleryImages || []);
     setGeocodingSuccessMsg('');
     setGeocodingOriginSuccessMsg('');
     setGeocodingDestSuccessMsg('');
@@ -1040,6 +1127,7 @@ export default function TripDashboardScreen() {
           hasKomootTrack,
           komootTrackUrl: hasKomootTrack ? komootTrackUrl.trim() : undefined,
           hasQrCode,
+          galleryImages: eventGalleryImages,
         });
       } else {
         await createEvent(
@@ -1077,7 +1165,8 @@ export default function TripDashboardScreen() {
           hasQrCode,
           rawCost,
           selectedCurr,
-          tripBaseCurrency
+          tripBaseCurrency,
+          eventGalleryImages
         );
       }
 
@@ -1620,6 +1709,30 @@ export default function TripDashboardScreen() {
             ) : null}
           </>
         )}
+
+        {/* Attached Event Gallery Photos Row */}
+        {item.galleryImages && item.galleryImages.length > 0 ? (
+          <View style={{ marginVertical: 8 }}>
+            <Text style={{ fontSize: 11, fontWeight: 'bold', color: colors.primary, marginBottom: 4, textAlign: isRTL ? 'right' : 'left' }}>
+              🖼️ {isRTL ? 'תמונות האירוע (לחץ להגדלה):' : 'Event Photos (Tap to enlarge):'}
+            </Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+              {item.galleryImages.map((imgUri, idx) => (
+                <TouchableOpacity
+                  key={idx}
+                  style={{ width: 64, height: 64, borderRadius: 8, overflow: 'hidden', borderWidth: 1, borderColor: '#dee2e6' }}
+                  onPress={() => {
+                    setPopupImageUri(imgUri);
+                    setIsPhotoPopupVisible(true);
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Image source={{ uri: imgUri }} style={{ width: '100%', height: '100%', resizeMode: 'cover' }} />
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        ) : null}
 
         {/* Action buttons under event */}
         <View style={[styles.eventActionsRow, rowDirectionStyle]}>
@@ -2409,6 +2522,24 @@ export default function TripDashboardScreen() {
               >
                 <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 12 }}>
                   ✉️ {isRTL ? 'שלח במייל' : 'Email'}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={{
+                  flex: 1.2,
+                  backgroundColor: '#4285F4',
+                  paddingVertical: 10,
+                  paddingHorizontal: 12,
+                  borderRadius: 8,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+                onPress={() => handleUploadToGooglePhotos(popupImageUri)}
+                activeOpacity={0.8}
+              >
+                <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 12 }}>
+                  🌐 Google Photos
                 </Text>
               </TouchableOpacity>
 
@@ -3831,6 +3962,95 @@ export default function TripDashboardScreen() {
                     </TouchableOpacity>
                   ))}
                 </View>
+              </View>
+
+              {/* Event Pictures & Camera Gallery Section */}
+              <View style={{
+                marginBottom: 16,
+                backgroundColor: '#f8f9fa',
+                padding: 14,
+                borderRadius: 12,
+                borderWidth: 1,
+                borderColor: '#dee2e6'
+              }}>
+                <Text style={[styles.modalFormLabel, textAlignStyle, { fontWeight: 'bold', fontSize: 13, color: colors.primary, marginBottom: 8 }]}>
+                  🖼️ {isRTL ? 'תמונות וגלריית אירוע (Event Pictures)' : 'Event Gallery Pictures'}
+                </Text>
+                
+                <View style={[rowDirectionStyle, { gap: 10, marginBottom: 10 }]}>
+                  <TouchableOpacity
+                    style={{
+                      flex: 1,
+                      backgroundColor: '#3b5bdb',
+                      paddingVertical: 10,
+                      paddingHorizontal: 12,
+                      borderRadius: 8,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 6
+                    }}
+                    onPress={handleCaptureEventImageCamera}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={{ fontSize: 14 }}>📸</Text>
+                    <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 12 }}>
+                      {isRTL ? 'צלם במצלמה' : 'Take Photo'}
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={{
+                      flex: 1,
+                      backgroundColor: '#1971c2',
+                      paddingVertical: 10,
+                      paddingHorizontal: 12,
+                      borderRadius: 8,
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: 6
+                    }}
+                    onPress={handlePickEventImageGallery}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={{ fontSize: 14 }}>📁</Text>
+                    <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 12 }}>
+                      {isRTL ? 'העלה מגלריה' : 'Pick Gallery'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Event Gallery Thumbnails Preview */}
+                {eventGalleryImages.length > 0 ? (
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingTop: 4 }}>
+                    {eventGalleryImages.map((imgUri, idx) => (
+                      <View key={idx} style={{ position: 'relative', width: 70, height: 70, borderRadius: 8, overflow: 'hidden', borderWidth: 1, borderColor: '#a5d8ff' }}>
+                        <Image source={{ uri: imgUri }} style={{ width: '100%', height: '100%', resizeMode: 'cover' }} />
+                        <TouchableOpacity
+                          style={{
+                            position: 'absolute',
+                            top: 2,
+                            right: 2,
+                            backgroundColor: 'rgba(224, 49, 49, 0.85)',
+                            borderRadius: 10,
+                            width: 18,
+                            height: 18,
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                          onPress={() => handleRemoveEventImage(idx)}
+                        >
+                          <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>✕</Text>
+                        </TouchableOpacity>
+                      </View>
+                    ))}
+                  </ScrollView>
+                ) : (
+                  <Text style={{ fontSize: 11, color: '#868e96', textAlign: isRTL ? 'right' : 'left', fontStyle: 'italic' }}>
+                    {isRTL ? 'טרם נוספו תמונות לאירוע זה' : 'No pictures added to this event yet'}
+                  </Text>
+                )}
               </View>
 
               {/* Dynamic Header Labels Based on Event Type */}

@@ -175,7 +175,8 @@ export const createEvent = async (
   hasQrCode?: boolean,
   originalCost?: number,
   originalCurrency?: string,
-  currency?: string
+  currency?: string,
+  galleryImages?: string[]
 ): Promise<Event> => {
   const eventsCollection = collection(db, 'events');
   const data: any = {
@@ -215,6 +216,7 @@ export const createEvent = async (
   if (originalCost !== undefined) data.originalCost = originalCost;
   if (originalCurrency !== undefined) data.originalCurrency = originalCurrency;
   if (currency !== undefined) data.currency = currency;
+  if (galleryImages !== undefined) data.galleryImages = galleryImages;
 
   const docRef = await addDoc(eventsCollection, data);
 
@@ -255,6 +257,7 @@ export const createEvent = async (
     originalCost,
     originalCurrency,
     currency,
+    galleryImages,
   };
 };
 
